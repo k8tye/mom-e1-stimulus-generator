@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>MoM E1 Stimulus Generator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: instrument console — fixed control rail on the left, stimulus stage on the right; stacks on phones. */
+:root{
+  --bg:#eef0f2; --panel:#f8f9fa; --fg:#1b2026; --muted:#5d6670; --line:#d3d8dd;
+  --stage:#15181b; --stage-fg:#d9dde1; --stage-line:#2c3237;
+  --accent:#c4302b; --accent-fg:#ffffff; --s2:#2b8fd6; --s2n:#d99a1e;
+  --ok:#2e7d4f; --warn:#b26a00;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111417; --panel:#181c20; --fg:#e3e7ea; --muted:#98a1aa; --line:#2b3238;
+  --stage:#0b0d0f; --stage-fg:#d9dde1; --stage-line:#252b30;
+  --accent:#e2524c; --accent-fg:#ffffff; --s2:#4aa8ec; --s2n:#e8b03f;
+  --ok:#5cbf86; --warn:#e6a23c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111417; --panel:#181c20; --fg:#e3e7ea; --muted:#98a1aa; --line:#2b3238;
+  --stage:#0b0d0f; --stage-fg:#d9dde1; --stage-line:#252b30;
+  --accent:#e2524c; --accent-fg:#ffffff; --s2:#4aa8ec; --s2n:#e8b03f;
+  --ok:#5cbf86; --warn:#e6a23c; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.45}
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);min-height:100%}
+.rail{background:var(--panel);border-right:1px solid var(--line);padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+.main{padding-block:16px 40px;padding-left:20px;padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px;min-width:0}
+h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);list-style:none;display:flex;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono)}
+details[open] summary::after{content:"–"}
+.fields{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.field{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.field label{font-size:13px}
+.field output,.field .val{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.field input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.field .hint{grid-column:1/-1;font-size:11.5px;color:var(--muted)}
+.field select{grid-column:2;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.seeds{display:flex;flex-direction:column;gap:6px}
+.seedrow{display:grid;grid-template-columns:1fr 92px 34px 34px;gap:6px;align-items:center}
+.seedrow span{font-size:13px}
+.seedrow input{font-family:var(--mono);font-size:12px;width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg)}
+.iconbtn{height:28px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:4px;cursor:pointer;font-size:13px;display:grid;place-items:center}
+.iconbtn[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.iconbtn:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--s2);outline-offset:1px}
+.btn{font:inherit;font-weight:500;font-size:13px;padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{font:inherit;font-size:12.5px;padding:6px 10px;border:0;background:var(--panel);color:var(--fg);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.status{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.stage{background:var(--stage);color:var(--stage-fg);border-radius:8px;padding:14px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+.tile{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile canvas{width:100%;height:auto;image-rendering:pixelated;background:#000;display:block;border:1px solid var(--stage-line)}
+.tilehead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px}
+.tilehead b{font-weight:500}
+.tilehead .dim{font-family:var(--mono);color:#8b949c;font-size:11px}
+.save{font:inherit;font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid var(--stage-line);background:transparent;color:var(--stage-fg);cursor:pointer}
+.save:hover{border-color:var(--stage-fg)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rowlabel{grid-column:1/-1;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8b949c;margin-top:2px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#aab2b9}
+.legend i{display:inline-block;width:10px;height:10px;border:2px solid;margin-right:5px;vertical-align:-1px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.fact{border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0;padding:9px 11px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.fact span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fact b{font-family:var(--mono);font-weight:500;font-size:13.5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.fact .pill{text-transform:none;letter-spacing:0}
+.pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid currentColor}
+.note{font-size:12.5px;color:var(--muted);max-width:75ch}
+.note code{font-family:var(--mono);font-size:11.5px}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden;flex:1;min-width:120px}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .15s}
+.file{display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.file input{font-size:12px;max-width:100%}
+.warn{color:var(--warn);font-size:12px}
+.diffwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;align-items:start}
+.diffwrap p{font-size:12px;color:#aab2b9;margin:0}
+@media (max-width:980px){.stage{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .main{padding-left:max(16px,env(safe-area-inset-left,0px))}
+  .grid3{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .diffwrap{grid-template-columns:1fr}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion: reduce){.progress div{transition:none}}
+</style>
+
+<div class="app">
+  <aside class="rail" aria-label="Generator settings">
+    <div>
+      <h1>MoM E1 Stimulus Generator</h1>
+      <p class="sub">Grain images, snippets and diffraction patterns for Mind Over Matter, Experiment 1.</p>
+    </div>
+
+    <section aria-labelledby="seedsTitle">
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <span id="seedsTitle" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Randomizers</span>
+        <span class="note" style="font-size:11px">🔒 = keep across new sets</span>
+      </div>
+      <div class="seeds" id="seeds"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="newSet" type="button">New set</button>
+        <span class="status" id="genStatus"></span>
+      </div>
+    </section>
+
+    <details open><summary>Source</summary><div class="fields" id="f-source"></div>
+      <div class="file" id="realInputs" hidden>
+        <label for="realImg">Micrograph (TIFF, PNG or JPG)</label>
+        <input id="realImg" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
+        <label for="realMask">Grain outline mask (e.g. “Mask of 06 outline.tif”)</label>
+        <input id="realMask" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
+        <span class="note" id="realState">No micrograph loaded. Generated grains are used until both files are loaded.</span>
+      </div>
+    </details>
+    <details open><summary>Field &amp; snippets</summary><div class="fields" id="f-field"></div></details>
+    <details><summary>Grains</summary><div class="fields" id="f-grains"></div></details>
+    <details open><summary>Target &amp; decoys</summary><div class="fields" id="f-target"></div></details>
+    <details open><summary>Movement &amp; noise</summary><div class="fields" id="f-move"></div></details>
+    <details><summary>Color change</summary><div class="fields" id="f-color"></div></details>
+    <details><summary>Surface texture</summary><div class="fields" id="f-tex"></div></details>
+    <details><summary>Diffraction pattern</summary><div class="fields" id="f-diff"></div></details>
+
+    <details open><summary>Export</summary>
+      <div class="fields" id="f-export"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="saveSet" type="button">Download this set (.zip)</button>
+        <button class="btn primary" id="saveBatch" type="button">Generate batch (.zip)</button>
+      </div>
+      <div class="row" style="margin-top:8px"><div class="progress" aria-hidden="true"><div id="prog"></div></div><span class="status" id="batchStatus"></span></div>
+      <p class="warn" id="dlWarn" hidden>Downloads aren’t available in this view. Open the artifact on claude.ai to save files.</p>
+    </details>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="row">
+        <div class="seg" role="group" aria-label="Base image colors">
+          <button type="button" id="vOrig" aria-pressed="true">Original</button>
+          <button type="button" id="vCC" aria-pressed="false">Color change</button>
+        </div>
+        <label class="check" style="align-items:center"><input type="checkbox" id="showBoxes" checked> Show snippet boxes</label>
+        <label class="check" style="align-items:center"><input type="checkbox" id="showMarks"> Mark target &amp; decoys</label>
+      </div>
+      <span class="status" id="setLabel"></span>
+    </div>
+
+    <section class="stage" aria-label="Current stimulus set">
+      <div class="tile">
+        <div class="tilehead"><b id="baseTitle">Base image</b><span class="dim" id="baseDim"></span><button class="save" data-img="base" type="button">Save PNG</button></div>
+        <canvas id="cBase" width="1000" height="1000" aria-label="Base grain image with snippet locations"></canvas>
+        <div class="legend"><span><i style="border-color:#e2524c"></i>Snippet 1</span><span><i style="border-color:#4aa8ec"></i>Snippet 2</span><span><i style="border-color:#e8b03f;border-style:dashed"></i>Snippet 2 + noise</span></div>
+      </div>
+      <div class="tile" style="gap:10px">
+        <div class="grid3" id="snips"></div>
+        <div class="diffwrap">
+          <div class="tile">
+            <div class="tilehead"><b>Diffraction</b><span class="dim" id="diffDim"></span><button class="save" data-img="diffraction" type="button">Save PNG</button></div>
+            <canvas id="cDiff" width="500" height="500" aria-label="Diffraction line pattern"></canvas>
+          </div>
+          <p id="diffNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="facts" id="facts" aria-label="Set parameters"></section>
+
+    <p class="note">Coordinates are in pixels from the top-left corner. <b>View shift</b> is how far the camera window moved across the base image between snippet 1 and snippet 2 (the stage move); on screen the target moves the opposite way. The batch zip holds every PNG in one <code>images/</code> folder, a <code>stimuli.csv</code> data source for Experiment Builder (one row per set), <code>sets.json</code> with decoy positions and all settings, and a README.</p>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* ---------------- RNG & noise ---------------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hmix(a,b){let h=(a^Math.imul(b|0,0x9E3779B1))>>>0;h=Math.imul(h^h>>>16,0x85EBCA6B);h=Math.imul(h^h>>>13,0xC2B2AE35);return (h^h>>>16)>>>0}
+function h2(x,y,s){let h=(s|0)^Math.imul(x|0,374761393)^Math.imul(y|0,668265263);h=Math.imul(h^h>>>13,1274126177);h^=h>>>16;return (h>>>0)/4294967296}
+function randn(r){let u=0,v=0;while(u===0)u=r();v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v)}
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function vnoise(x,y,s){const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;const ux=fx*fx*(3-2*fx),uy=fy*fy*(3-2*fy);
+  const a=h2(ix,iy,s),b=h2(ix+1,iy,s),c=h2(ix,iy+1,s),d=h2(ix+1,iy+1,s);return (a+(b-a)*ux+(c-a)*uy+(a-b-c+d)*ux*uy)*2-1}
+function shuffle(arr,r){for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+
+/* ---------------- Settings ---------------- */
+const P = {
+  mode:"procedural", realScaleMin:0.7, realScaleMax:1.3, fitRealGreys:true,
+  snip:250, mult:4, margin:200, edgePad:6,
+  grainMin:30, grainMax:110, sizeVar:0.45, wobble:0.25, greyMin:60, greyMax:235, shading:6, twinProb:0.35, twinContrast:70,
+  targetMin:12, targetMax:20, targetPure:true, decoyStyle:"blob", decoyCount:12, decoyNear:3, decoyGrey:38, decoyJitter:6,
+  shiftMode:"balanced", minShift:20, maxShift:100, gainMin:0.5, gainMax:0.9, jitter:0,
+  recolorDelta:35,
+  texNoise:8, scratches:4, pits:60,
+  diffSize:500, diffBands:4,
+  batchN:40, includeBase:true
+};
+const seeds = {shape:0, color:0, place:0, noise:0};
+const locks = {shape:false, color:false, place:false, noise:false};
+const SEED_INFO = [
+  ["shape","Grain shapes","Grain layout, twins, texture"],
+  ["color","Grain colors","Grey value of every grain"],
+  ["place","Target & move","Target, decoys, snippet 1, shift"],
+  ["noise","Noise","Miscalibration amount"]
+];
+const CONTROLS = {
+  "f-source":[
+    {k:"mode",label:"Grain source",type:"select",opts:[["procedural","Generated grains"],["real","Real micrograph + mask"]]},
+    {k:"realScaleMin",label:"Real: zoom min",min:0.5,max:2,step:0.05,real:true},
+    {k:"realScaleMax",label:"Real: zoom max",min:0.5,max:2,step:0.05,real:true,hint:"Each set picks a zoom in this range, so grain size varies."},
+    {k:"fitRealGreys",label:"Real: fit grain greys to the grey range",type:"check",real:true},
+  ],
+  "f-field":[
+    {k:"snip",label:"Snippet size",min:100,max:600,step:10,unit:"px"},
+    {k:"mult",label:"Base = snippet ×",min:2,max:6,step:0.5,hint:"Base image width and height as a multiple of the snippet."},
+    {k:"margin",label:"Target keeps away from base edge",min:0,max:600,step:10,unit:"px"},
+    {k:"edgePad",label:"Target padding inside snippets",min:0,max:40,step:1,unit:"px"},
+  ],
+  "f-grains":[
+    {k:"grainMin",label:"Grain size, fine end",min:10,max:250,step:2,unit:"px"},
+    {k:"grainMax",label:"Grain size, coarse end",min:10,max:250,step:2,unit:"px",hint:"Each new set picks a mean grain diameter in this range."},
+    {k:"sizeVar",label:"Size variety within an image",min:0,max:0.9,step:0.05},
+    {k:"wobble",label:"Boundary waviness",min:0,max:1,step:0.05},
+    {k:"greyMin",label:"Darkest grain",min:0,max:200,step:1,hint:"0 = black, 255 = white. Keep above the decoy grey."},
+    {k:"greyMax",label:"Lightest grain",min:60,max:255,step:1},
+    {k:"shading",label:"Shading inside grains",min:0,max:30,step:1},
+    {k:"twinProb",label:"Grains with twin bands",min:0,max:1,step:0.05},
+    {k:"twinContrast",label:"Twin band contrast",min:0,max:150,step:5},
+  ],
+  "f-target":[
+    {k:"targetMin",label:"Target size min",min:4,max:40,step:1,unit:"% of snippet"},
+    {k:"targetMax",label:"Target size max",min:4,max:40,step:1,unit:"% of snippet"},
+    {k:"targetPure",label:"Target is pure black (no texture)",type:"check"},
+    {k:"decoyStyle",label:"Decoy style",type:"select",opts:[["blob","Blobs (target-like)"],["grain","Dark grains"]]},
+    {k:"decoyCount",label:"Decoys in base image",min:0,max:40,step:1},
+    {k:"decoyNear",label:"…of which near the target",min:0,max:10,step:1,hint:"Placed close to the target so they land inside the snippets."},
+    {k:"decoyGrey",label:"Decoy grey",min:0,max:140,step:1,hint:"Tune by eye: close enough to need a careful look, not so close it’s impossible."},
+    {k:"decoyJitter",label:"Decoy grey variation ±",min:0,max:30,step:1},
+  ],
+  "f-move":[
+    {k:"shiftMode",label:"Shift type",type:"select",opts:[["balanced","Balanced 50/50"],["single","X or Y only"],["X","X only"],["Y","Y only"],["XY","X and Y"]],hint:"Balanced: half the batch moves on one axis (X/Y split evenly), half on both."},
+    {k:"minShift",label:"Smallest shift",min:0,max:60,step:1,unit:"% of snippet"},
+    {k:"maxShift",label:"Largest shift",min:5,max:100,step:1,unit:"% of snippet"},
+    {k:"gainMin",label:"Noise: movement gain min",min:0,max:2,step:0.05},
+    {k:"gainMax",label:"Noise: movement gain max",min:0,max:2,step:0.05,hint:"Noisy snippet moves gain × the intended shift. 0.5 = moves half as far."},
+    {k:"jitter",label:"Noise: extra random offset ±",min:0,max:40,step:1,unit:"px"},
+  ],
+  "f-color":[
+    {k:"recolorDelta",label:"Minimum grey change per grain",min:0,max:120,step:1,hint:"Every grain except the target and decoys gets a new grey at least this different."},
+  ],
+  "f-tex":[
+    {k:"texNoise",label:"Pixel noise",min:0,max:30,step:1},
+    {k:"scratches",label:"Polishing scratches",min:0,max:15,step:1},
+    {k:"pits",label:"Pits",min:0,max:300,step:5},
+  ],
+  "f-diff":[
+    {k:"diffSize",label:"Pattern size",min:100,max:1200,step:10,unit:"px"},
+    {k:"diffBands",label:"Bands through center",min:2,max:6,step:1},
+  ],
+  "f-export":[
+    {k:"batchN",label:"Sets in batch",min:1,max:200,step:1},
+    {k:"includeBase",label:"Include base images (large files)",type:"check"},
+  ]
+};
+function newSeed(){return (Math.random()*0xFFFFFFFF)>>>0}
+
+/* ---------------- Real image support ---------------- */
+let REAL = null; // {w,h,gray:Float32Array,label:Int32Array,nLab,means:Float32Array}
+let realImgRaw=null, realMaskRaw=null;
+
+function parseTiff(buf){
+  const dv=new DataView(buf);const bo=dv.getUint16(0);const le=bo===0x4949;if(!le&&bo!==0x4D4D)throw new Error("Not a TIFF file");
+  const u16=o=>dv.getUint16(o,le),u32=o=>dv.getUint32(o,le);
+  const ifd=u32(4);const n=u16(ifd);const tags={};
+  for(let i=0;i<n;i++){const e=ifd+2+i*12;const tag=u16(e),type=u16(e+2),cnt=u32(e+4);
+    const sz=type===3?2:type===4?4:1;const off=cnt*sz>4?u32(e+8):e+8;const vals=[];
+    for(let j=0;j<cnt;j++)vals.push(type===3?u16(off+j*2):type===4?u32(off+j*4):dv.getUint8(off+j));tags[tag]=vals}
+  const w=tags[256][0],h=tags[257][0],bps=(tags[258]||[8])[0],comp=(tags[259]||[1])[0],spp=(tags[277]||[1])[0];
+  if(comp!==1)throw new Error("Compressed TIFF — export it as PNG instead");
+  const offs=tags[273],cnts=tags[279];const out=new Float32Array(w*h);const bpp=bps/8*spp;let p=0;
+  for(let s=0;s<offs.length&&p<w*h;s++){const o=offs[s],c=cnts[s];
+    for(let b=0;b+bpp<=c&&p<w*h;b+=bpp){out[p++]=bps===16?(le?dv.getUint16(o+b,true):dv.getUint16(o+b,false)):dv.getUint8(o+b)}}
+  return {w,h,data:out,bps};
+}
+async function decodeImageFile(file){
+  const name=file.name.toLowerCase();
+  if(name.endsWith(".tif")||name.endsWith(".tiff")){
+    const t=parseTiff(await file.arrayBuffer());
+    if(t.bps===16){const s=Array.from(t.data.filter((_,i)=>i%97===0)).sort((a,b)=>a-b);const lo=s[Math.floor(s.length*0.005)],hi=s[Math.floor(s.length*0.995)];
+      for(let i=0;i<t.data.length;i++)t.data[i]=clamp((t.data[i]-lo)/(hi-lo||1)*255,0,255)}
+    return {w:t.w,h:t.h,data:t.data};
+  }
+  const bmp=await createImageBitmap(file);const c=document.createElement("canvas");c.width=bmp.width;c.height=bmp.height;
+  const x=c.getContext("2d");x.drawImage(bmp,0,0);const id=x.getImageData(0,0,c.width,c.height).data;const out=new Float32Array(c.width*c.height);
+  for(let i=0;i<out.length;i++)out[i]=(id[i*4]*0.299+id[i*4+1]*0.587+id[i*4+2]*0.114)*(id[i*4+3]/255)+(255-id[i*4+3]);
+  return {w:c.width,h:c.height,data:out};
+}
+function trimInfoBar(img){ // SEM frames are 3:2 plus a data bar underneath
+  const want=Math.round(img.w*2/3);if(img.h>want+20){return {w:img.w,h:want,data:img.data.subarray(0,img.w*want)}}return img}
+function buildReal(img,mask){
+  img=trimInfoBar(img);mask=trimInfoBar(mask);
+  if(img.w!==mask.w||img.h!==mask.h)throw new Error(`Image is ${img.w}×${img.h} but mask is ${mask.w}×${mask.h}`);
+  const w=img.w,h=img.h,N=w*h;const bin=new Uint8Array(N);for(let i=0;i<N;i++)bin[i]=mask.data[i]>=128?1:0;
+  // the boundary class is the one whose pixels mostly touch the other class
+  const touch=[0,0],cnt=[0,0];
+  for(let y=1;y<h-1;y+=2)for(let x=1;x<w-1;x+=2){const i=y*w+x,c=bin[i];cnt[c]++;if(bin[i-1]!==c||bin[i+1]!==c||bin[i-w]!==c||bin[i+w]!==c)touch[c]++}
+  const interior=(touch[0]/(cnt[0]||1))<(touch[1]/(cnt[1]||1))?0:1;
+  const label=new Int32Array(N);let nLab=0;const stack=new Int32Array(N);
+  for(let i=0;i<N;i++){if(bin[i]!==interior||label[i])continue;nLab++;let sp=0;stack[sp++]=i;label[i]=nLab;
+    while(sp){const p=stack[--sp];const x=p%w;
+      if(x>0&&!label[p-1]&&bin[p-1]===interior){label[p-1]=nLab;stack[sp++]=p-1}
+      if(x<w-1&&!label[p+1]&&bin[p+1]===interior){label[p+1]=nLab;stack[sp++]=p+1}
+      if(p>=w&&!label[p-w]&&bin[p-w]===interior){label[p-w]=nLab;stack[sp++]=p-w}
+      if(p<N-w&&!label[p+w]&&bin[p+w]===interior){label[p+w]=nLab;stack[sp++]=p+w}}}
+  // drop specks and the big exterior: components < 30 px become unlabeled; component touching >40% border = exterior
+  const area=new Int32Array(nLab+1);for(let i=0;i<N;i++)area[label[i]]++;
+  for(let i=0;i<N;i++)if(label[i]&&area[label[i]]<30)label[i]=0;
+  // grow labels into boundary lines (up to 8 px)
+  for(let it=0;it<8;it++){let changed=0;const nl=label.slice();
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(label[i])continue;
+      const c=(x>0&&label[i-1])||(x<w-1&&label[i+1])||(y>0&&label[i-w])||(y<h-1&&label[i+w]);if(c){nl[i]=c;changed++}}
+    label.set(nl);if(!changed)break}
+  const sum=new Float64Array(nLab+1),n=new Float64Array(nLab+1);for(let i=0;i<N;i++){sum[label[i]]+=img.data[i];n[label[i]]++}
+  const means=new Float32Array(nLab+1);for(let g=0;g<=nLab;g++)means[g]=n[g]?sum[g]/n[g]:128;
+  let grains=0;for(let g=1;g<=nLab;g++)if(n[g])grains++;
+  return {w,h,gray:img.data,label,nLab,means,grains,unlabeled:n[0]/N};
+}
+
+/* ---------------- Grain field ---------------- */
+function buildProceduralField(B,seed){
+  const r=mulberry32(hmix(seed,11));
+  const gmin=Math.min(P.grainMin,P.grainMax),gmax=Math.max(P.grainMin,P.grainMax);
+  const d=lerp(gmin,gmax,r());const R0=d/2;const pad=Math.ceil(d*2);const W=B+2*pad;
+  const nTarget=Math.ceil(1.15*W*W/(Math.PI*R0*R0));
+  const radii=[];for(let i=0;i<nTarget;i++)radii.push(clamp(R0*Math.exp(P.sizeVar*randn(r)),R0*0.3,R0*3.2));
+  radii.sort((a,b)=>b-a);const rmax=radii[0]||R0;
+  const C=d;const gw=Math.ceil(W/C)+1;const cells=new Map();
+  const sx=[],sy=[],sr=[];
+  for(const rad of radii){
+    for(let a=0;a<30;a++){const x=r()*W-pad,y=r()*W-pad;const cx=Math.floor((x+pad)/C),cy=Math.floor((y+pad)/C);
+      const reach=Math.ceil((rad+rmax)*0.85/C);let ok=true;
+      for(let j=cy-reach;j<=cy+reach&&ok;j++)for(let i=cx-reach;i<=cx+reach&&ok;i++){const L=cells.get(j*gw+i);if(!L)continue;
+        for(const s of L){const dx=sx[s]-x,dy=sy[s]-y;const m=(sr[s]+rad)*0.85;if(dx*dx+dy*dy<m*m){ok=false;break}}}
+      if(ok){const id=sx.length;sx.push(x);sy.push(y);sr.push(rad);const key=cy*gw+cx;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(id);break}}}
+  const n=sx.length;const wgt=new Float32Array(n);for(let s=0;s<n;s++)wgt[s]=sr[s]*sr[s]*0.9;
+  // bucket for labeling
+  const head=new Int32Array(gw*gw).fill(-1),next=new Int32Array(n);
+  for(let s=0;s<n;s++){const cx=Math.floor((sx[s]+pad)/C),cy=Math.floor((sy[s]+pad)/C);if(cx<0||cy<0||cx>=gw||cy>=gw)continue;const k=cy*gw+cx;next[s]=head[k];head[k]=s}
+  const label=new Int32Array(B*B);const amp=P.wobble*d*0.18;const L=Math.max(8,d*0.6);const ws=hmix(seed,12);
+  for(let y=0;y<B;y++)for(let x=0;x<B;x++){
+    let wx=x,wy=y;if(amp>0){wx+=amp*vnoise(x/L,y/L,ws);wy+=amp*vnoise(x/L+31.7,y/L+17.3,ws)}
+    const cx=Math.floor((wx+pad)/C),cy=Math.floor((wy+pad)/C);let best=1e18,bs=0;
+    for(let j=cy-2;j<=cy+2;j++){if(j<0||j>=gw)continue;for(let i=cx-2;i<=cx+2;i++){if(i<0||i>=gw)continue;
+      for(let s=head[j*gw+i];s!==-1;s=next[s]){const dx=sx[s]-wx,dy=sy[s]-wy;const v=dx*dx+dy*dy-wgt[s];if(v<best){best=v;bs=s}}}}
+    label[y*B+x]=bs}
+  // twins and texture
+  const twin=new Uint8Array(B*B);const tex=new Float32Array(B*B);
+  const tw=[];for(let s=0;s<n;s++){if(r()<P.twinProb){const a=r()*Math.PI;tw[s]={c:Math.cos(a),s:Math.sin(a),per:d*lerp(0.12,0.45,r()),wf:lerp(0.25,0.6,r()),dens:lerp(0.35,0.85,r()),ph:r()*1000}}}
+  const gx=new Float32Array(n),gy=new Float32Array(n);for(let s=0;s<n;s++){gx[s]=randn(r);gy[s]=randn(r)}
+  const ts=hmix(seed,13);
+  for(let y=0;y<B;y++)for(let x=0;x<B;x++){const i=y*B+x,g=label[i],t=tw[g];
+    if(t){const u=(x*t.c+y*t.s+t.ph)/t.per;const cell=Math.floor(u),f=u-cell;
+      if(h2(g,cell,ts)<t.dens){const wdt=t.wf*(0.35+0.65*h2(g+7,cell,ts+1));const a0=h2(cell,g,ts+2)*(1-wdt);if(f>=a0&&f<a0+wdt)twin[i]=1}}
+    tex[i]=P.shading*((x-sx[g])*gx[g]+(y-sy[g])*gy[g])/d*0.5}
+  addTexture(tex,B,r,seed);
+  return {B,label,twin,tex,n,d,cx:sx,cy:sy,kind:"procedural"};
+}
+function addTexture(tex,B,r,seed){
+  const ls=hmix(seed,14);
+  for(let i=0;i<B*B;i++){const x=i%B,y=(i/B)|0;tex[i]+=P.texNoise*randn(r)+3*vnoise(x/180,y/180,ls)}
+  for(let k=0;k<P.scratches;k++){const a=r()*Math.PI,c=Math.cos(a),s=Math.sin(a),off=(r()-0.5)*B*1.2,wd=lerp(0.6,2.2,r()),amp=lerp(6,20,r());
+    const cx=B/2,cy=B/2;for(let y=0;y<B;y++)for(let x=0;x<B;x++){const dist=Math.abs((x-cx)*-s+(y-cy)*c-off);if(dist<wd*3)tex[y*B+x]+=amp*Math.exp(-dist*dist/(2*wd*wd))}}
+  for(let k=0;k<P.pits;k++){const px=r()*B,py=r()*B,pr=lerp(0.8,2.6,r()),amp=-lerp(25,60,r());
+    for(let y=Math.max(0,Math.floor(py-pr*2));y<Math.min(B,Math.ceil(py+pr*2));y++)for(let x=Math.max(0,Math.floor(px-pr*2));x<Math.min(B,Math.ceil(px+pr*2));x++){
+      const dd=(x-px)**2+(y-py)**2;tex[y*B+x]+=amp*Math.exp(-dd/(2*pr*pr))}}
+}
+function buildRealField(B,seed){
+  const r=mulberry32(hmix(seed,21));const sMin=Math.min(P.realScaleMin,P.realScaleMax),sMax=Math.max(P.realScaleMin,P.realScaleMax);
+  let scale=lerp(sMin,sMax,r());const src=Math.min(REAL.w,REAL.h);if(B/scale>src)scale=B/src;const cw=B/scale;
+  let best=null;for(let a=0;a<30;a++){const ox=r()*(REAL.w-cw),oy=r()*(REAL.h-cw);let un=0,tot=0;
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const sxp=Math.floor(ox+(x+0.5)*cw/16),syp=Math.floor(oy+(y+0.5)*cw/16);tot++;if(!REAL.label[syp*REAL.w+sxp])un++}
+    if(!best||un/tot<best.un){best={ox,oy,un:un/tot}}if(best.un===0)break}
+  const label=new Int32Array(B*B),tex=new Float32Array(B*B),twin=new Uint8Array(B*B);
+  for(let y=0;y<B;y++)for(let x=0;x<B;x++){const fx=best.ox+(x+0.5)/scale,fy=best.oy+(y+0.5)/scale;
+    const ix=Math.min(REAL.w-1,Math.floor(fx)),iy=Math.min(REAL.h-1,Math.floor(fy));const si=iy*REAL.w+ix;const g=REAL.label[si];
+    // bilinear grey
+    const x0=Math.min(REAL.w-2,Math.max(0,Math.floor(fx-0.5))),y0=Math.min(REAL.h-2,Math.max(0,Math.floor(fy-0.5)));const tx=clamp(fx-0.5-x0,0,1),ty=clamp(fy-0.5-y0,0,1);
+    const G=REAL.gray,w=REAL.w;const v=(G[y0*w+x0]*(1-tx)+G[y0*w+x0+1]*tx)*(1-ty)+(G[(y0+1)*w+x0]*(1-tx)+G[(y0+1)*w+x0+1]*tx)*ty;
+    label[y*B+x]=g;tex[y*B+x]=v-REAL.means[g]}
+  // texture add-ons on top of the real texture
+  const keep=P.texNoise;P.texNoise=0;addTexture(tex,B,r,seed);P.texNoise=keep;
+  // grain centers for decoy-grain selection
+  const n=REAL.nLab+1,sx=new Float64Array(n),sy=new Float64Array(n),c=new Float64Array(n);
+  for(let i=0;i<B*B;i++){const g=label[i];sx[g]+=i%B;sy[g]+=(i/B)|0;c[g]++}
+  for(let g=0;g<n;g++){if(c[g]){sx[g]/=c[g];sy[g]/=c[g]}}
+  return {B,label,twin,tex,n,d:null,scale,unmasked:best.un,cx:sx,cy:sy,kind:"real",present:c};
+}
+
+/* ---------------- Grey tables ---------------- */
+function baseGreys(field,seed){
+  const r=mulberry32(hmix(seed,31));const lo=Math.min(P.greyMin,P.greyMax),hi=Math.max(P.greyMin,P.greyMax);
+  const g=new Float32Array(field.n),t=new Float32Array(field.n);
+  if(field.kind==="real"){
+    const m=REAL.means;let ml=255,mh=0;if(P.fitRealGreys){const arr=[];for(let k=1;k<m.length;k++)arr.push(m[k]);arr.sort((a,b)=>a-b);ml=arr[Math.floor(arr.length*0.02)]||0;mh=arr[Math.floor(arr.length*0.98)]||255}
+    for(let k=0;k<field.n;k++){g[k]=P.fitRealGreys?lerp(lo,hi,clamp((m[k]-ml)/((mh-ml)||1),0,1)):Math.max(lo,m[k]);t[k]=g[k]}
+    if(!P.fitRealGreys)g[0]=m[0];
+  } else {
+    for(let k=0;k<field.n;k++){g[k]=lerp(lo,hi,r());const dd=lerp(20,Math.max(21,P.twinContrast),r())*(r()<0.5?-1:1);t[k]=clamp(g[k]+dd,lo,hi);if(Math.abs(t[k]-g[k])<15)t[k]=clamp(g[k]-dd,lo,hi)}
+  }
+  return {g,t};
+}
+function recolorGreys(field,orig,seed){
+  const r=mulberry32(hmix(seed,41));const lo=Math.min(P.greyMin,P.greyMax),hi=Math.max(P.greyMin,P.greyMax);
+  const g=new Float32Array(field.n),t=new Float32Array(field.n);
+  for(let k=0;k<field.n;k++){let best=null,bd=-1;for(let a=0;a<8;a++){const v=lerp(lo,hi,r());const dd=Math.abs(v-orig.g[k]);if(dd>=P.recolorDelta){best=v;break}if(dd>bd){bd=dd;best=v}}
+    g[k]=best;t[k]=clamp(best+(orig.t[k]-orig.g[k]),lo,hi)}
+  if(field.kind==="real"&&!P.fitRealGreys){g[0]=orig.g[0];t[0]=orig.t[0]}
+  return {g,t};
+}
+function compose(field,greys){
+  const B=field.B,out=new Uint8ClampedArray(B*B);const floor=Math.max(1,Math.min(P.greyMin,P.decoyGrey+P.decoyJitter+12));
+  for(let i=0;i<B*B;i++){const gi=field.label[i];const v=(field.twin[i]?greys.t[gi]:greys.g[gi])+field.tex[i];out[i]=v<floor?floor:v}
+  return out;
+}
+
+/* ---------------- Blobs: target and decoys ---------------- */
+function makeBlob(r,R){const h=[];let tot=0;for(let k=2;k<=6;k++){const a=r()*0.22/(k*0.55);tot+=a;h.push({k,a,ph:r()*6.283})}return {R,h,Rmax:R*(1+tot)}}
+function blobRadius(b,th){let v=1;for(const q of b.h)v+=q.a*Math.sin(q.k*th+q.ph);return b.R*v}
+function drawBlob(img,field,cx,cy,b,val,texMul){
+  // only the target may reach pure black; decoys stay at least a few levels above it
+  const lowest=val===0?0:Math.max(1,Math.min(val,P.decoyGrey-P.decoyJitter)-8);
+  const B=field.B;const x0=Math.max(0,Math.floor(cx-b.Rmax-2)),x1=Math.min(B-1,Math.ceil(cx+b.Rmax+2)),y0=Math.max(0,Math.floor(cy-b.Rmax-2)),y1=Math.min(B-1,Math.ceil(cy+b.Rmax+2));
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x+0.5-cx,dy=y+0.5-cy;const dist=Math.hypot(dx,dy);const e=blobRadius(b,Math.atan2(dy,dx))-dist;
+    const cov=clamp(e+0.5,0,1);if(cov<=0)continue;const i=y*B+x;const v=clamp(val+field.tex[i]*texMul,lowest,255);img[i]=img[i]*(1-cov)+v*cov}
+}
+
+/* ---------------- Placement, shift, noise ---------------- */
+function place(field,placeSeed,noiseSeed,forcedType){
+  const B=field.B,S=P.snip,r=mulberry32(hmix(placeSeed,51));
+  const tMin=Math.min(P.targetMin,P.targetMax),tMax=Math.max(P.targetMin,P.targetMax);
+  const target=makeBlob(r,S*lerp(tMin,tMax,r())/100/2);
+  const m=clamp(P.margin,target.Rmax+P.edgePad,B/2-1);
+  const tx=lerp(m,B-m,r()),ty=lerp(m,B-m,r());
+  const reach=target.Rmax+P.edgePad;
+  const lo=v=>Math.max(0,Math.ceil(v+reach-S)),hi=v=>Math.min(B-S,Math.floor(v-reach));
+  const loX=lo(tx),hiX=hi(tx),loY=lo(ty),hiY=hi(ty);
+  let type=forcedType;if(!type){const mode=P.shiftMode;type=mode==="X"||mode==="Y"||mode==="XY"?mode:mode==="single"?(r()<0.5?"X":"Y"):(r()<0.5?(r()<0.5?"X":"Y"):"XY")}
+  const minS=Math.round(S*P.minShift/100),maxS=Math.round(S*Math.max(P.minShift,P.maxShift)/100);
+  function axis(loA,hiA,moves){const W=hiA-loA;if(!moves){return {p1:Math.round(lerp(loA,hiA,r())),d:0}}
+    const top=Math.min(maxS,W);const mag=Math.round(lerp(Math.min(minS,top),top,r()));const sign=r()<0.5?-1:1;const dd=mag*sign;
+    const a=Math.max(loA,loA-dd),b=Math.min(hiA,hiA-dd);return {p1:Math.round(lerp(a,b,r())),d:dd,tooTight:minS>W}}
+  const ax=axis(loX,hiX,type!=="Y"),ay=axis(loY,hiY,type!=="X");
+  const s1={x:ax.p1,y:ay.p1},s2={x:ax.p1+ax.d,y:ay.p1+ay.d};
+  // noise
+  const rn=mulberry32(hmix(noiseSeed,61));const gl=Math.min(P.gainMin,P.gainMax),gh=Math.max(P.gainMin,P.gainMax);const gain=lerp(gl,gh,rn());
+  const jx=type!=="Y"?Math.round((rn()*2-1)*P.jitter):0,jy=type!=="X"?Math.round((rn()*2-1)*P.jitter):0;
+  let ndx=Math.round(ax.d*gain)+jx,ndy=Math.round(ay.d*gain)+jy;
+  const s2n={x:clamp(s1.x+ndx,loX,hiX),y:clamp(s1.y+ndy,loY,hiY)};ndx=s2n.x-s1.x;ndy=s2n.y-s1.y;
+  // decoys
+  const dec=[];const occupied=[{x:tx,y:ty,R:target.Rmax}];
+  function free(x,y,R){for(const o of occupied){if(Math.hypot(o.x-x,o.y-y)<(o.R+R)*1.35)return false}return true}
+  const nNear=Math.min(P.decoyNear,P.decoyCount);
+  for(let k=0;k<P.decoyCount;k++){const b=makeBlob(r,S*lerp(tMin,tMax,r())/100/2);const near=k<nNear;let ok=false,x,y;
+    for(let a=0;a<80&&!ok;a++){if(near){const ang=r()*6.283,dist=lerp(target.Rmax*2.2,S*0.75,r());x=tx+Math.cos(ang)*dist;y=ty+Math.sin(ang)*dist}else{x=lerp(b.Rmax,B-b.Rmax,r());y=lerp(b.Rmax,B-b.Rmax,r())}
+      ok=x>b.Rmax&&y>b.Rmax&&x<B-b.Rmax&&y<B-b.Rmax&&free(x,y,b.Rmax)}
+    if(ok){occupied.push({x,y,R:b.Rmax});dec.push({x,y,blob:b,grey:clamp(P.decoyGrey+Math.round((r()*2-1)*P.decoyJitter),0,255),near})}}
+  return {type,target:{x:tx,y:ty,blob:target},decoys:dec,s1,s2,s2n,shift:{dx:ax.d,dy:ay.d},noisy:{dx:ndx,dy:ndy,gain},tooTight:ax.tooTight||ay.tooTight};
+}
+function applyDecoyGrains(field,pl,greysList){
+  // Dark-grain decoys: pick grains whose center is near each decoy position, darken them in every grey table
+  const picked=new Set();const tg=field.label[Math.round(pl.target.y)*field.B+Math.round(pl.target.x)];
+  for(const d of pl.decoys){let best=-1,bd=1e18;for(let g=0;g<field.n;g++){if(g===tg||picked.has(g)||(field.present&&!field.present[g]))continue;const dd=(field.cx[g]-d.x)**2+(field.cy[g]-d.y)**2;if(dd<bd){bd=dd;best=g}}
+    if(best>=0){picked.add(best);d.grain=best;for(const G of greysList){G.g[best]=d.grey;G.t[best]=d.grey}}}
+}
+
+/* ---------------- Diffraction ---------------- */
+function buildDiffraction(seed,Pz){
+  const r=mulberry32(hmix(seed,71));const img=new Float32Array(Pz*Pz);const cx=Pz/2,cy=Pz/2;const sc=Pz/500;
+  for(let y=0;y<Pz;y++)for(let x=0;x<Pz;x++){const rr=Math.hypot(x-cx,y-cy)/(Pz*0.75);img[y*Pz+x]=152-22*rr*rr}
+  const g=(d,s)=>Math.exp(-d*d/(2*s*s));
+  const lines=[];const nb=P.diffBands;const a0=r()*Math.PI;
+  for(let k=0;k<nb;k++){const a=a0+k*Math.PI/nb+(r()-0.5)*0.25;lines.push({a,off:0,w:sc*lerp(5,20,r()),amp:lerp(55,85,r()),band:true})}
+  const extra=3+Math.floor(r()*4);for(let k=0;k<extra;k++){lines.push({a:r()*Math.PI,off:(r()-0.5)*Pz*0.9,w:sc*lerp(3,9,r()),amp:lerp(18,35,r()),band:true})}
+  for(const L of lines){const c=Math.cos(L.a),s=Math.sin(L.a);
+    for(let y=0;y<Pz;y++)for(let x=0;x<Pz;x++){const d=Math.abs((x-cx)*-s+(y-cy)*c-L.off);if(d>L.w*3+12*sc)continue;const i=y*Pz+x;
+      img[i]+=L.amp*(g(d-L.w,1.1*sc+0.4))+(d<L.w?8:0)-14*g(d-L.w-3*sc,1.8*sc)+L.amp*0.28*g(d-L.w*2.3,1.0*sc+0.3)}}
+  for(let y=0;y<Pz;y++)for(let x=0;x<Pz;x++){const i=y*Pz+x;img[i]+=40*g(Math.hypot(x-cx,y-cy),6*sc)+4*randn(r)}
+  const out=new Uint8ClampedArray(Pz*Pz);for(let i=0;i<out.length;i++)out[i]=img[i];return {img:out,size:Pz,cx,cy};
+}
+
+/* ---------------- Set generation ---------------- */
+function crop(img,B,x,y,S){const out=new Uint8ClampedArray(S*S);for(let j=0;j<S;j++)out.set(img.subarray((y+j)*B+x,(y+j)*B+x+S),j*S);return out}
+const fieldCache={key:null,field:null};
+function generateSet(sd,forcedType,setNo){
+  const S=P.snip,B=Math.round(S*P.mult);
+  const useReal=P.mode==="real"&&REAL;
+  const fkey=JSON.stringify([useReal?"r":"p",sd.shape,B,P.grainMin,P.grainMax,P.sizeVar,P.wobble,P.shading,P.twinProb,P.texNoise,P.scratches,P.pits,P.realScaleMin,P.realScaleMax,useReal?REAL.nLab:0]);
+  let field;if(fieldCache.key===fkey)field=fieldCache.field;else{field=useReal?buildRealField(B,sd.shape):buildProceduralField(B,sd.shape);fieldCache.key=fkey;fieldCache.field=field}
+  const pl=place(field,sd.place,sd.noise,forcedType);
+  const g0=baseGreys(field,sd.color);const g1=recolorGreys(field,g0,hmix(sd.color,99));
+  if(P.decoyStyle==="grain")applyDecoyGrains(field,pl,[g0,g1]);
+  const imgs={};
+  for(const [suffix,G] of [["",g0],["_cc",g1]]){
+    const base=compose(field,G);
+    if(P.decoyStyle==="blob")for(const d of pl.decoys)drawBlob(base,field,d.x,d.y,d.blob,d.grey,0.6);
+    drawBlob(base,field,pl.target.x,pl.target.y,pl.target.blob,0,P.targetPure?0:0.6);
+    imgs["base"+suffix]=base;imgs["s1"+suffix]=crop(base,B,pl.s1.x,pl.s1.y,S);imgs["s2"+suffix]=crop(base,B,pl.s2.x,pl.s2.y,S);imgs["s2_noise"+suffix]=crop(base,B,pl.s2n.x,pl.s2n.y,S);
+  }
+  const diff=buildDiffraction(hmix(sd.place,7),Math.round(P.diffSize));
+  const inside=(d,s)=>d.x>=s.x&&d.x<s.x+S&&d.y>=s.y&&d.y<s.y+S;
+  return {setNo,seeds:{...sd},S,B,field:{kind:field.kind,d:field.d,scale:field.scale,unmasked:field.unmasked},pl,imgs,diff,
+    decoysIn:{s1:pl.decoys.filter(d=>inside(d,pl.s1)).length,s2:pl.decoys.filter(d=>inside(d,pl.s2)).length,s2n:pl.decoys.filter(d=>inside(d,pl.s2n)).length}};
+}
+
+/* ---------------- Rendering ---------------- */
+function grayToCanvas(cv,data,w,h){cv.width=w;cv.height=h;const x=cv.getContext("2d");const id=x.createImageData(w,h);const p=id.data;
+  for(let i=0;i<w*h;i++){const v=data[i];p[i*4]=p[i*4+1]=p[i*4+2]=v;p[i*4+3]=255}x.putImageData(id,0,0);return cv}
+const SNIPS=[["s1","Snippet 1"],["s2","Snippet 2"],["s2_noise","Snippet 2 + noise"]];
+function buildSnipTiles(){const el=document.getElementById("snips");el.innerHTML="";
+  for(const [suffix,row] of [["","Original colors"],["_cc","Color change"]]){
+    const lab=document.createElement("div");lab.className="rowlabel";lab.textContent=row;el.appendChild(lab);
+    for(const [k,name] of SNIPS){const t=document.createElement("div");t.className="tile";
+      t.innerHTML=`<div class="tilehead"><b>${name}</b><button class="save" data-img="${k+suffix}" type="button">PNG</button></div><canvas id="c_${k+suffix}" aria-label="${name}, ${row.toLowerCase()}"></canvas>`;el.appendChild(t)}}}
+let CUR=null, VIEW="";
+function render(){
+  if(!CUR)return;const s=CUR,S=s.S,B=s.B,pl=s.pl;
+  const cv=document.getElementById("cBase");grayToCanvas(cv,s.imgs["base"+VIEW],B,B);const x=cv.getContext("2d");const lw=Math.max(2,B/300);
+  if(document.getElementById("showBoxes").checked){
+    x.lineWidth=lw;x.setLineDash([]);x.strokeStyle="#e2524c";x.strokeRect(pl.s1.x,pl.s1.y,S,S);x.strokeStyle="#4aa8ec";x.strokeRect(pl.s2.x,pl.s2.y,S,S);
+    x.strokeStyle="#e8b03f";x.setLineDash([lw*4,lw*3]);x.strokeRect(pl.s2n.x,pl.s2n.y,S,S);x.setLineDash([]);}
+  if(document.getElementById("showMarks").checked){x.lineWidth=lw;x.strokeStyle="#00e08a";x.beginPath();x.arc(pl.target.x,pl.target.y,pl.target.blob.Rmax+lw*3,0,7);x.stroke();
+    x.strokeStyle="#ff4fd8";for(const d of pl.decoys){x.beginPath();x.arc(d.x,d.y,d.blob.Rmax+lw*2,0,7);x.stroke()}}
+  document.getElementById("baseTitle").textContent=VIEW?"Base image · color change":"Base image";
+  document.getElementById("baseDim").textContent=`${B}×${B}`;
+  for(const suffix of ["","_cc"])for(const [k] of SNIPS)grayToCanvas(document.getElementById("c_"+k+suffix),s.imgs[k+suffix],S,S);
+  grayToCanvas(document.getElementById("cDiff"),s.diff.img,s.diff.size,s.diff.size);document.getElementById("diffDim").textContent=`${s.diff.size}×${s.diff.size}`;
+  document.getElementById("diffNote").innerHTML=`Pattern center sits at (${s.diff.cx}, ${s.diff.cy}) in the image. For this set, the correct arrow-key movement equals the view shift: <b style="font-family:var(--mono)">${fmtShift(pl.shift.dx,pl.shift.dy)}</b>.`;
+  renderFacts();
+}
+function fmtShift(dx,dy){return `x ${dx>0?"+":""}${dx}, y ${dy>0?"+":""}${dy}`}
+function renderFacts(){
+  const s=CUR,pl=s.pl;const tS=(sn)=>`${Math.round(pl.target.x-sn.x)}, ${Math.round(pl.target.y-sn.y)}`;
+  const f=[
+    ["Shift type",`<span class="pill">${pl.type==="XY"?"X and Y":pl.type+" only"}</span>`],
+    ["View shift (px)",fmtShift(pl.shift.dx,pl.shift.dy)],
+    ["Noisy shift (px)",`${fmtShift(pl.noisy.dx,pl.noisy.dy)} · gain ${pl.noisy.gain.toFixed(2)}`],
+    ["Target in base",`${Math.round(pl.target.x)}, ${Math.round(pl.target.y)} · Ø ${Math.round(pl.target.blob.R*2)}`],
+    ["Target in snippet 1",tS(pl.s1)],["Target in snippet 2",tS(pl.s2)],["Target in snippet 2 + noise",tS(pl.s2n)],
+    ["Decoys visible",`S1 ${s.decoysIn.s1} · S2 ${s.decoysIn.s2} · S2n ${s.decoysIn.s2n}`],
+    [s.field.kind==="real"?"Real image zoom":"Mean grain size",s.field.kind==="real"?`${s.field.scale.toFixed(2)}× · ${(s.field.unmasked*100).toFixed(0)}% unmasked`:`${Math.round(s.field.d)} px`],
+  ];
+  document.getElementById("facts").innerHTML=f.map(([a,b])=>`<div class="fact"><span>${a}</span><b>${b}</b></div>`).join("");
+  document.getElementById("setLabel").textContent=pl.tooTight?"Shift range is tighter than the smallest shift; raise snippet size or lower target size.":"";
+}
+
+/* ---------------- Controls ---------------- */
+function fmtVal(c,v){if(c.type==="check")return "";const dec=(String(c.step).split(".")[1]||"").length;return Number(v).toFixed(dec)+(c.unit?(c.unit.startsWith("%")?"%":" "+c.unit):"")}
+function buildControls(){
+  for(const [box,list] of Object.entries(CONTROLS)){const el=document.getElementById(box);
+    for(const c of list){const w=document.createElement("div");const id="p_"+c.k;
+      if(c.type==="check"){w.className="check";w.innerHTML=`<input type="checkbox" id="${id}"><label for="${id}">${c.label}</label>`;el.appendChild(w);const inp=w.querySelector("input");inp.checked=!!P[c.k];inp.addEventListener("change",()=>{P[c.k]=inp.checked;changed(c.k)})}
+      else if(c.type==="select"){w.className="field";w.innerHTML=`<label for="${id}">${c.label}</label><select id="${id}">${c.opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("")}</select>${c.hint?`<span class="hint">${c.hint}</span>`:""}`;el.appendChild(w);
+        const s=w.querySelector("select");s.value=P[c.k];s.addEventListener("change",()=>{P[c.k]=s.value;changed(c.k)})}
+      else{w.className="field";w.innerHTML=`<label for="${id}">${c.label}</label><output for="${id}" id="o_${c.k}">${fmtVal(c,P[c.k])}</output><input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${P[c.k]}">${c.hint?`<span class="hint">${c.hint}</span>`:""}`;el.appendChild(w);
+        const inp=w.querySelector("input");inp.addEventListener("input",()=>{P[c.k]=parseFloat(inp.value);document.getElementById("o_"+c.k).textContent=fmtVal(c,P[c.k]);changed(c.k)})}
+      if(c.real){w.dataset.real="1"}
+    }}
+  syncRealVisibility();
+}
+function syncRealVisibility(){const real=P.mode==="real";document.getElementById("realInputs").hidden=!real;document.querySelectorAll("[data-real]").forEach(e=>e.hidden=!real)}
+function buildSeeds(){const el=document.getElementById("seeds");el.innerHTML="";
+  for(const [k,name,hint] of SEED_INFO){const row=document.createElement("div");row.className="seedrow";
+    row.innerHTML=`<span title="${hint}">${name}</span><input id="seed_${k}" inputmode="numeric" aria-label="${name} seed" value="${seeds[k]}"><button class="iconbtn" type="button" id="lock_${k}" aria-pressed="${locks[k]}" title="Keep this the same for new sets" aria-label="Lock ${name}">🔒</button><button class="iconbtn" type="button" id="roll_${k}" title="New random ${name.toLowerCase()}" aria-label="Randomize ${name}">↻</button>`;
+    el.appendChild(row);
+    row.querySelector("input").addEventListener("change",e=>{const v=parseInt(e.target.value,10);if(Number.isFinite(v)){seeds[k]=v>>>0;regen()}else e.target.value=seeds[k]});
+    row.querySelector("#lock_"+k).addEventListener("click",e=>{locks[k]=!locks[k];e.currentTarget.setAttribute("aria-pressed",locks[k])});
+    row.querySelector("#roll_"+k).addEventListener("click",()=>{seeds[k]=newSeed();syncSeeds();regen()})}}
+function syncSeeds(){for(const k in seeds)document.getElementById("seed_"+k).value=seeds[k]}
+let regenTimer=null;
+function changed(k){if(k==="mode")syncRealVisibility();if(k==="batchN"||k==="includeBase")return;clearTimeout(regenTimer);regenTimer=setTimeout(regen,180)}
+function regen(){const st=document.getElementById("genStatus");st.textContent="Generating…";
+  setTimeout(()=>{const t0=performance.now();try{CUR=generateSet({...seeds},null,1);render();st.textContent=`Ready · ${Math.round(performance.now()-t0)} ms`}catch(e){st.textContent="Error: "+e.message;console.error(e)}},20)}
+
+/* ---------------- Export ---------------- */
+let downloads=null;
+function pngBlob(data,w,h){return new Promise(res=>{const c=grayToCanvas(document.createElement("canvas"),data,w,h);c.toBlob(b=>res(b),"image/png")})}
+function setId(n){return "set"+String(n).padStart(3,"0")}
+const FILE_KEYS=["base","s1","s2","s2_noise","base_cc","s1_cc","s2_cc","s2_noise_cc"];
+function csvRow(s){const pl=s.pl,id=setId(s.setNo);const t=pl.target;const r=v=>Math.round(v);const f=k=>`${id}_${k}.png`;
+  return {set_id:id,shift_type:pl.type,snippet_px:s.S,base_px:s.B,view_dx:pl.shift.dx,view_dy:pl.shift.dy,noise_gain:pl.noisy.gain.toFixed(3),noisy_dx:pl.noisy.dx,noisy_dy:pl.noisy.dy,
+    s1_x:pl.s1.x,s1_y:pl.s1.y,s2_x:pl.s2.x,s2_y:pl.s2.y,s2n_x:pl.s2n.x,s2n_y:pl.s2n.y,
+    target_base_x:r(t.x),target_base_y:r(t.y),target_radius_px:r(t.blob.Rmax),
+    target_s1_x:r(t.x-pl.s1.x),target_s1_y:r(t.y-pl.s1.y),target_s2_x:r(t.x-pl.s2.x),target_s2_y:r(t.y-pl.s2.y),target_s2n_x:r(t.x-pl.s2n.x),target_s2n_y:r(t.y-pl.s2n.y),
+    decoys_in_s1:s.decoysIn.s1,decoys_in_s2:s.decoysIn.s2,decoys_in_s2n:s.decoysIn.s2n,
+    grain_size_px:s.field.d?r(s.field.d):"",real_zoom:s.field.scale?s.field.scale.toFixed(2):"",decoy_grey:P.decoyGrey,
+    img_base:P.includeBase?f("base"):"",img_s1:f("s1"),img_s2:f("s2"),img_s2_noise:f("s2_noise"),img_base_cc:P.includeBase?f("base_cc"):"",img_s1_cc:f("s1_cc"),img_s2_cc:f("s2_cc"),img_s2_noise_cc:f("s2_noise_cc"),
+    img_diffraction:f("diffraction"),diff_center_x:s.diff.cx,diff_center_y:s.diff.cy,
+    seed_shape:s.seeds.shape,seed_color:s.seeds.color,seed_place:s.seeds.place,seed_noise:s.seeds.noise}}
+function toCSV(rows){const cols=Object.keys(rows[0]);return [cols.join(","),...rows.map(r=>cols.map(c=>r[c]).join(","))].join("\r\n")}
+function setJSON(s){const pl=s.pl;const r=v=>Math.round(v*10)/10;return {set_id:setId(s.setNo),seeds:s.seeds,shift_type:pl.type,view_shift:pl.shift,noisy_shift:{dx:pl.noisy.dx,dy:pl.noisy.dy,gain:+pl.noisy.gain.toFixed(4)},
+  snippet1:pl.s1,snippet2:pl.s2,snippet2_noise:pl.s2n,target:{x:r(pl.target.x),y:r(pl.target.y),radius:r(pl.target.blob.Rmax)},
+  decoys:pl.decoys.map(d=>({x:r(d.x),y:r(d.y),radius:r(d.blob.Rmax),grey:d.grey,near_target:d.near})),field:s.field}}
+const README=`MoM E1 stimulus package
+=======================
+images/ holds every PNG (8-bit greyscale content). Per set:
+  setNNN_base.png, setNNN_s1.png, setNNN_s2.png, setNNN_s2_noise.png   original colors
+  setNNN_base_cc.png ... setNNN_s2_noise_cc.png                         color change (same layout, new greys)
+  setNNN_diffraction.png                                                line pattern, zone-axis center at diff_center_x/y
+stimuli.csv is one row per set (Experiment Builder data source). Rename columns to suit.
+
+Coordinates: pixels, origin at the top-left corner.
+  s1_x/s1_y etc.   top-left corner of each snippet inside the base image
+  view_dx/view_dy  how far the view (stage) moved from snippet 1 to snippet 2 (= s2 - s1)
+                   On screen the target moves by the opposite amount: target_s2 = target_s1 - view shift.
+                   The correct arrow-key movement of the diffraction pattern should equal this shift.
+  noisy_dx/dy      the shift actually applied for snippet 2 + noise (miscalibration): gain x intended (+ optional offset)
+  target_*         target center in the base image and in each snippet; target_radius_px = largest radius
+  decoys_in_*      decoy blobs whose center falls inside that snippet
+Trials: Tr = s1 -> s2. Tr+C = s1 -> s2_cc. Noise versions use s2_noise / s2_noise_cc.
+sets.json repeats this per set with decoy positions, and settings.json stores every generator setting.
+Re-enter the four seeds in the generator to rebuild any set exactly.`;
+async function saveFile(filename,data){if(!downloads)return;try{await downloads.save({filename,data})}catch(e){const st=document.getElementById("batchStatus");st.textContent=e.code==="declined"?"Download cancelled.":"Couldn’t save: "+(e.message||e.code)}}
+async function addSetToZip(zip,s){const id=setId(s.setNo);const S=s.S,B=s.B;
+  for(const k of FILE_KEYS){if(!P.includeBase&&k.startsWith("base"))continue;const big=k.startsWith("base");zip.file(`images/${id}_${k}.png`,await pngBlob(s.imgs[k],big?B:S,big?B:S))}
+  zip.file(`images/${id}_diffraction.png`,await pngBlob(s.diff.img,s.diff.size,s.diff.size))}
+function batchTypes(n,seed){const mode=P.shiftMode;const r=mulberry32(hmix(seed,555));
+  if(mode==="X"||mode==="Y"||mode==="XY")return Array(n).fill(mode);
+  if(mode==="single"){const a=[];for(let i=0;i<n;i++)a.push(i%2?"Y":"X");return shuffle(a,r)}
+  const a=[];const half=Math.floor(n/2);for(let i=0;i<half;i++)a.push(i%2?"Y":"X");for(let i=half;i<n;i++)a.push("XY");return shuffle(a,r)}
+function derive(seed,i){return i===0?seed:hmix(seed,i*7919+13)}
+async function runExport(n,single){
+  const btns=[document.getElementById("saveBatch"),document.getElementById("saveSet")];btns.forEach(b=>b.disabled=true);
+  const st=document.getElementById("batchStatus"),bar=document.getElementById("prog");const zip=new JSZip();const rows=[],sets=[];
+  try{
+    const types=single?[CUR.pl.type]:batchTypes(n,seeds.place);
+    for(let i=0;i<n;i++){
+      let s;if(single)s=CUR;else{const sd={};for(const k in seeds)sd[k]=locks[k]?seeds[k]:derive(seeds[k],i);s=generateSet(sd,types[i],i+1)}
+      rows.push(csvRow(s));sets.push(setJSON(s));await addSetToZip(zip,s);
+      bar.style.width=((i+1)/n*90)+"%";st.textContent=`Set ${i+1} of ${n}`;await new Promise(r=>setTimeout(r,0))}
+    zip.file("stimuli.csv",toCSV(rows));zip.file("sets.json",JSON.stringify(sets,null,1));zip.file("settings.json",JSON.stringify({settings:P,seeds,locks},null,1));zip.file("README.txt",README);
+    st.textContent="Compressing…";const blob=await zip.generateAsync({type:"blob",compression:"STORE"},m=>{bar.style.width=(90+m.percent*0.1)+"%"});
+    const counts=rows.reduce((a,r)=>(a[r.shift_type]=(a[r.shift_type]||0)+1,a),{});
+    st.textContent=`${n} set${n>1?"s":""} · ${(blob.size/1048576).toFixed(1)} MB · `+Object.entries(counts).map(([k,v])=>`${k} ${v}`).join(", ");
+    const stamp=new Date().toISOString().slice(0,10);await saveFile(single?`mom-e1_${setId(1)}_${stamp}.zip`:`mom-e1_stimuli_${n}sets_${stamp}.zip`,blob);
+  }catch(e){st.textContent="Error: "+e.message;console.error(e)}
+  finally{btns.forEach(b=>b.disabled=false);if(!downloads)btns.forEach(b=>b.disabled=true)}
+}
+
+/* ---------------- Wiring ---------------- */
+function init(){
+  for(const k in seeds)seeds[k]=[2718281,3141592,1618033,1414213][Object.keys(seeds).indexOf(k)];
+  buildSeeds();buildControls();buildSnipTiles();
+  document.getElementById("newSet").addEventListener("click",()=>{for(const k in seeds)if(!locks[k])seeds[k]=newSeed();syncSeeds();regen()});
+  const setView=v=>{VIEW=v;document.getElementById("vOrig").setAttribute("aria-pressed",v==="");document.getElementById("vCC").setAttribute("aria-pressed",v==="_cc");render()};
+  document.getElementById("vOrig").addEventListener("click",()=>setView(""));document.getElementById("vCC").addEventListener("click",()=>setView("_cc"));
+  document.getElementById("showBoxes").addEventListener("change",render);document.getElementById("showMarks").addEventListener("change",render);
+  document.getElementById("saveBatch").addEventListener("click",()=>runExport(Math.round(P.batchN),false));
+  document.getElementById("saveSet").addEventListener("click",()=>runExport(1,true));
+  document.querySelector(".stage").addEventListener("click",async e=>{const b=e.target.closest(".save");if(!b||!CUR)return;const k=b.dataset.img;
+    let data,w,h;if(k==="diffraction"){data=CUR.diff.img;w=h=CUR.diff.size}else{const kk=k==="base"?"base"+VIEW:k;data=CUR.imgs[kk];w=h=kk.startsWith("base")?CUR.B:CUR.S;var name=kk}
+    await saveFile(`${setId(1)}_${name||k}.png`,await pngBlob(data,w,h))});
+  async function loadReal(){const st=document.getElementById("realState");if(!realImgRaw||!realMaskRaw){st.textContent=realImgRaw?"Micrograph loaded. Add its mask.":"Mask loaded. Add the micrograph.";return}
+    st.textContent="Finding grains…";await new Promise(r=>setTimeout(r,20));
+    try{REAL=buildReal(realImgRaw,realMaskRaw);fieldCache.key=null;st.textContent=`${REAL.grains} grains found · ${REAL.w}×${REAL.h}${REAL.unlabeled>0.05?` · ${(REAL.unlabeled*100).toFixed(0)}% outside the mask (crops avoid it where possible)`:""}`;regen()}
+    catch(e){REAL=null;st.textContent="Couldn’t use these files: "+e.message}}
+  document.getElementById("realImg").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{realImgRaw=await decodeImageFile(f)}catch(err){document.getElementById("realState").textContent="Couldn’t read the micrograph: "+err.message;return}loadReal()});
+  document.getElementById("realMask").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;try{realMaskRaw=await decodeImageFile(f)}catch(err){document.getElementById("realState").textContent="Couldn’t read the mask: "+err.message;return}loadReal()});
+  regen();
+  (async()=>{for(let i=0;i<30&&!(window.claude&&window.claude.use);i++)await new Promise(r=>setTimeout(r,100));
+    if(!(window.claude&&window.claude.use)){ // running outside Claude (e.g. GitHub Pages): plain browser downloads
+      downloads={save:async({filename,data})=>{const blob=data instanceof Blob?data:new Blob([data]);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);return {status:"saved"}}};
+    } else {try{downloads=await window.claude.use("downloads")}catch(e){downloads=null}}
+    if(!downloads){document.getElementById("dlWarn").hidden=false;document.getElementById("saveBatch").disabled=true;document.getElementById("saveSet").disabled=true;document.querySelectorAll(".save").forEach(b=>b.disabled=true)}})();
+}
+init();
+</script>
+
+</body>
+</html>
