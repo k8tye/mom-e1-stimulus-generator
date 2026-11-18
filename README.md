@@ -2,22 +2,20 @@
 
 Browser tool that generates stimuli for **Mind Over Matter, Experiment 1** (LSU DMAE/VIS · Cognitive Science · MIE).
 
-Each stimulus set contains:
+It follows the target relocation design in `Exp_Design_Spreadsheet_Final` (6 Nov 2026): 48 trials in 2 blocks of 24, with 8 No change, 8 Shifted, and 8 Shifted + recolored per block. The shifted conditions use each of the 8 directions once per block, and the No change trials use them as counterfactual shifts.
 
-- a base grain image with one pure-black target and near-black decoys
-- snippet 1, snippet 2 (shifted on X, Y, or both), and snippet 2 + noise (miscalibrated shift)
-- color-change versions of all four
-- a diffraction line pattern
-- one row in `stimuli.csv` with shift amounts, target coordinates, file names, and seeds
+Each trial gives:
 
-Batches balance shift types 50/50 (single axis vs. X and Y). Seeds make every set reproducible.
+- a Phase 2 search image and a Phase 5 relocate image (grain field, one pure-black target, near-black decoys)
+- a Phase 3 Kikuchi pattern
+- one row in `trials.csv` / `trials.txt` (Experiment Builder data source) with the design-sheet columns, file names, and screen coordinates
 
 ## Use
 
-Open the GitHub Pages site, adjust settings, then click **Generate batch (.zip)**. Optional: switch *Grain source* to a real micrograph and load it with its grain outline mask.
+Open the GitHub Pages site, adjust settings, then set the display and shift distance, then click **Generate all 48 trials (.zip)**. Optional: switch *Grain source* to a real micrograph and load it with its grain outline mask.
 
 Everything runs locally in the browser; no data is uploaded.
 
 ## Coordinates
 
-Pixels, origin top-left. `view_dx`/`view_dy` = snippet 2 position minus snippet 1 position (the stage move). See `README.txt` inside each exported zip for every column.
+Screen pixels, origin top-left, y down. The `dx`/`dy` columns keep the sheet's convention (U = +1). See `README.txt` inside each exported zip for every column.

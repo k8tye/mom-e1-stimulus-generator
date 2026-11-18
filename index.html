@@ -105,28 +105,36 @@ details[open] summary::after{content:"–"}
   .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion: reduce){.progress div{transition:none}}
+.trialnav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.trialnav select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--fg);max-width:100%}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cond{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#aab2b9}
+.err{background:color-mix(in srgb,var(--accent) 14%,var(--panel));border:1px solid var(--accent);color:var(--fg);padding:8px 12px;border-radius:6px;font-size:13px}
+.calc{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
 </style>
 
 <div class="app">
   <aside class="rail" aria-label="Generator settings">
     <div>
       <h1>MoM E1 Stimulus Generator</h1>
-      <p class="sub">Grain images, snippets and diffraction patterns for Mind Over Matter, Experiment 1.</p>
+      <p class="sub">Target relocation study · 48-trial design (2 blocks × 24) · Experiment Builder export</p>
     </div>
 
     <section aria-labelledby="seedsTitle">
       <div class="row" style="justify-content:space-between;margin-bottom:6px">
         <span id="seedsTitle" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Randomizers</span>
-        <span class="note" style="font-size:11px">🔒 = keep across new sets</span>
+        <span class="note" style="font-size:11px">🔒 = same image for every trial</span>
       </div>
       <div class="seeds" id="seeds"></div>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="newSet" type="button">New set</button>
+        <button class="btn primary" id="newSet" type="button">New images</button>
         <span class="status" id="genStatus"></span>
       </div>
     </section>
 
-    <details open><summary>Source</summary><div class="fields" id="f-source"></div>
+    <details open><summary>Display &amp; shift</summary><div class="fields" id="f-display"></div>
+      <div class="calc" id="degCalc" style="margin-top:8px"></div></details>
+    <details><summary>Source</summary><div class="fields" id="f-source"></div>
       <div class="file" id="realInputs" hidden>
         <label for="realImg">Micrograph (TIFF, PNG or JPG)</label>
         <input id="realImg" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
@@ -135,19 +143,18 @@ details[open] summary::after{content:"–"}
         <span class="note" id="realState">No micrograph loaded. Generated grains are used until both files are loaded.</span>
       </div>
     </details>
-    <details open><summary>Field &amp; snippets</summary><div class="fields" id="f-field"></div></details>
+    <details><summary>Image &amp; field size</summary><div class="fields" id="f-field"></div></details>
     <details><summary>Grains</summary><div class="fields" id="f-grains"></div></details>
     <details open><summary>Target &amp; decoys</summary><div class="fields" id="f-target"></div></details>
-    <details open><summary>Movement &amp; noise</summary><div class="fields" id="f-move"></div></details>
-    <details><summary>Color change</summary><div class="fields" id="f-color"></div></details>
+    <details><summary>Recolor</summary><div class="fields" id="f-color"></div></details>
     <details><summary>Surface texture</summary><div class="fields" id="f-tex"></div></details>
     <details><summary>Diffraction pattern</summary><div class="fields" id="f-diff"></div></details>
 
     <details open><summary>Export</summary>
       <div class="fields" id="f-export"></div>
       <div class="row" style="margin-top:10px">
-        <button class="btn" id="saveSet" type="button">Download this set (.zip)</button>
-        <button class="btn primary" id="saveBatch" type="button">Generate batch (.zip)</button>
+        <button class="btn" id="saveSet" type="button">Download this trial (.zip)</button>
+        <button class="btn primary" id="saveBatch" type="button">Generate all 48 trials (.zip)</button>
       </div>
       <div class="row" style="margin-top:8px"><div class="progress" aria-hidden="true"><div id="prog"></div></div><span class="status" id="batchStatus"></span></div>
       <p class="warn" id="dlWarn" hidden>Downloads aren’t available in this view. Open the artifact on claude.ai to save files.</p>
@@ -156,28 +163,43 @@ details[open] summary::after{content:"–"}
 
   <main class="main">
     <div class="toolbar">
+      <div class="trialnav">
+        <button class="btn" type="button" id="prevTrial" aria-label="Previous trial">‹</button>
+        <label for="trialSel" class="status" style="position:absolute;left:-9999px">Trial</label>
+        <select id="trialSel"></select>
+        <button class="btn" type="button" id="nextTrial" aria-label="Next trial">›</button>
+      </div>
       <div class="row">
         <div class="seg" role="group" aria-label="Base image colors">
           <button type="button" id="vOrig" aria-pressed="true">Original</button>
-          <button type="button" id="vCC" aria-pressed="false">Color change</button>
+          <button type="button" id="vCC" aria-pressed="false">Recolored</button>
         </div>
-        <label class="check" style="align-items:center"><input type="checkbox" id="showBoxes" checked> Show snippet boxes</label>
-        <label class="check" style="align-items:center"><input type="checkbox" id="showMarks"> Mark target &amp; decoys</label>
+        <label class="check" style="align-items:center"><input type="checkbox" id="showBoxes" checked> Image windows</label>
+        <label class="check" style="align-items:center"><input type="checkbox" id="showMarks"> Mark target, decoys &amp; ROI</label>
       </div>
-      <span class="status" id="setLabel"></span>
     </div>
+    <div class="err" id="errBox" hidden></div>
 
-    <section class="stage" aria-label="Current stimulus set">
+    <section class="stage" aria-label="Current trial">
       <div class="tile">
         <div class="tilehead"><b id="baseTitle">Base image</b><span class="dim" id="baseDim"></span><button class="save" data-img="base" type="button">Save PNG</button></div>
-        <canvas id="cBase" width="1000" height="1000" aria-label="Base grain image with snippet locations"></canvas>
-        <div class="legend"><span><i style="border-color:#e2524c"></i>Snippet 1</span><span><i style="border-color:#4aa8ec"></i>Snippet 2</span><span><i style="border-color:#e8b03f;border-style:dashed"></i>Snippet 2 + noise</span></div>
+        <canvas id="cBase" width="1000" height="1000" aria-label="Base grain image with image windows"></canvas>
+        <div class="legend"><span><i style="border-color:#e2524c"></i>Phase 2 window</span><span><i style="border-color:#4aa8ec"></i>Phase 5 window</span><span><i style="border-color:#e8b03f;border-style:dashed"></i>Counterfactual (No change)</span></div>
       </div>
-      <div class="tile" style="gap:10px">
-        <div class="grid3" id="snips"></div>
+      <div class="tile" style="gap:12px">
+        <div class="pair">
+          <div class="tile">
+            <div class="tilehead"><b>Phase 2 · Search</b><button class="save" data-img="search" type="button">PNG</button></div>
+            <canvas id="cSearch" aria-label="Phase 2 search image"></canvas>
+          </div>
+          <div class="tile">
+            <div class="tilehead"><b>Phase 5 · Relocate</b><button class="save" data-img="relocate" type="button">PNG</button></div>
+            <canvas id="cReloc" aria-label="Phase 5 relocate image"></canvas>
+          </div>
+        </div>
         <div class="diffwrap">
           <div class="tile">
-            <div class="tilehead"><b>Diffraction</b><span class="dim" id="diffDim"></span><button class="save" data-img="diffraction" type="button">Save PNG</button></div>
+            <div class="tilehead"><b>Phase 3 · Kikuchi</b><span class="dim" id="diffDim"></span><button class="save" data-img="diffraction" type="button">PNG</button></div>
             <canvas id="cDiff" width="500" height="500" aria-label="Diffraction line pattern"></canvas>
           </div>
           <p id="diffNote"></p>
@@ -185,9 +207,9 @@ details[open] summary::after{content:"–"}
       </div>
     </section>
 
-    <section class="facts" id="facts" aria-label="Set parameters"></section>
+    <section class="facts" id="facts" aria-label="Trial parameters"></section>
 
-    <p class="note">Coordinates are in pixels from the top-left corner. <b>View shift</b> is how far the camera window moved across the base image between snippet 1 and snippet 2 (the stage move); on screen the target moves the opposite way. The batch zip holds every PNG in one <code>images/</code> folder, a <code>stimuli.csv</code> data source for Experiment Builder (one row per set), <code>sets.json</code> with decoy positions and all settings, and a README.</p>
+    <p class="note">Screen coordinates assume the grain image is drawn centered on the display and the crosshair sits at screen center. Pixels, origin top-left, y increases downward. The <code>dx</code>/<code>dy</code> columns keep the design sheet’s convention (U = +1). The zip holds every PNG in <code>images/</code>, <code>trials.csv</code> and a tab-delimited <code>trials.txt</code> for the Experiment Builder data source (48 rows, same order and columns as the Trials sheet plus file names and coordinates), <code>trials.json</code>, <code>settings.json</code> and a README.</p>
   </main>
 </div>
 
@@ -208,39 +230,50 @@ function shuffle(arr,r){for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(
 /* ---------------- Settings ---------------- */
 const P = {
   mode:"procedural", realScaleMin:0.7, realScaleMax:1.3, fitRealGreys:true,
-  snip:250, mult:4, margin:200, edgePad:6,
+  screenW:1920, screenH:1080, screenCm:53.1, distCm:70,
+  shiftDeg:3, diagMode:"perAxis", dirMeaning:"target", minSepDeg:2, roiDeg:1.5,
+  snip:400, mult:2.5, margin:120, edgePad:6,
   grainMin:30, grainMax:110, sizeVar:0.45, wobble:0.25, greyMin:60, greyMax:235, shading:6, twinProb:0.35, twinContrast:70,
   targetMin:12, targetMax:20, targetPure:true, decoyStyle:"blob", decoyCount:12, decoyNear:3, decoyGrey:38, decoyJitter:6,
-  shiftMode:"balanced", minShift:20, maxShift:100, gainMin:0.5, gainMax:0.9, jitter:0,
   recolorDelta:35,
   texNoise:8, scratches:4, pits:60,
   diffSize:500, diffBands:4,
-  batchN:40, includeBase:true
+  includeBase:false
 };
-const seeds = {shape:0, color:0, place:0, noise:0};
-const locks = {shape:false, color:false, place:false, noise:false};
+const seeds = {shape:0, color:0, place:0};
+const locks = {shape:false, color:false, place:false};
 const SEED_INFO = [
   ["shape","Grain shapes","Grain layout, twins, texture"],
-  ["color","Grain colors","Grey value of every grain"],
-  ["place","Target & move","Target, decoys, snippet 1, shift"],
-  ["noise","Noise","Miscalibration amount"]
+  ["color","Grain colors","Grey value of every grain, and the recolor"],
+  ["place","Target placement","Target, decoys and image window position"]
 ];
 const CONTROLS = {
+  "f-display":[
+    {k:"shiftDeg",label:"Shift distance (= centering offset)",min:0.5,max:10,step:0.1,unit:"°",hint:"TO SET in the design sheet. Same distance on every trial."},
+    {k:"diagMode",label:"Two-axis shifts move",type:"select",opts:[["perAxis","Full distance on each axis"],["diagonal","Full distance along the diagonal"]],hint:"Per axis matches dx = ±1, dy = ±1 in the Trials sheet."},
+    {k:"dirMeaning",label:"Direction names the way",type:"select",opts:[["target","the image moves on screen"],["stage","the view / stage moves"]],hint:"“L” with the first option: the target appears further left in Phase 5."},
+    {k:"minSepDeg",label:"Minimum old-to-new separation",min:0,max:10,step:0.1,unit:"°",hint:"Checked on every shifted trial."},
+    {k:"roiDeg",label:"Target ROI = target edge +",min:0,max:5,step:0.1,unit:"°"},
+    {k:"screenW",label:"Screen width",min:800,max:3840,step:10,unit:"px"},
+    {k:"screenH",label:"Screen height",min:600,max:2160,step:10,unit:"px"},
+    {k:"screenCm",label:"Screen width",min:20,max:120,step:0.1,unit:"cm"},
+    {k:"distCm",label:"Viewing distance",min:30,max:150,step:1,unit:"cm"},
+  ],
   "f-source":[
     {k:"mode",label:"Grain source",type:"select",opts:[["procedural","Generated grains"],["real","Real micrograph + mask"]]},
     {k:"realScaleMin",label:"Real: zoom min",min:0.5,max:2,step:0.05,real:true},
-    {k:"realScaleMax",label:"Real: zoom max",min:0.5,max:2,step:0.05,real:true,hint:"Each set picks a zoom in this range, so grain size varies."},
+    {k:"realScaleMax",label:"Real: zoom max",min:0.5,max:2,step:0.05,real:true,hint:"Each trial picks a zoom in this range, so grain size varies."},
     {k:"fitRealGreys",label:"Real: fit grain greys to the grey range",type:"check",real:true},
   ],
   "f-field":[
-    {k:"snip",label:"Snippet size",min:100,max:600,step:10,unit:"px"},
-    {k:"mult",label:"Base = snippet ×",min:2,max:6,step:0.5,hint:"Base image width and height as a multiple of the snippet."},
-    {k:"margin",label:"Target keeps away from base edge",min:0,max:600,step:10,unit:"px"},
-    {k:"edgePad",label:"Target padding inside snippets",min:0,max:40,step:1,unit:"px"},
+    {k:"snip",label:"Image size on screen",min:150,max:1000,step:10,unit:"px"},
+    {k:"mult",label:"Base field = image ×",min:1.5,max:5,step:0.5,hint:"The field the image window moves across."},
+    {k:"margin",label:"Target keeps away from field edge",min:0,max:600,step:10,unit:"px"},
+    {k:"edgePad",label:"Target padding inside the image",min:0,max:60,step:1,unit:"px"},
   ],
   "f-grains":[
     {k:"grainMin",label:"Grain size, fine end",min:10,max:250,step:2,unit:"px"},
-    {k:"grainMax",label:"Grain size, coarse end",min:10,max:250,step:2,unit:"px",hint:"Each new set picks a mean grain diameter in this range."},
+    {k:"grainMax",label:"Grain size, coarse end",min:10,max:250,step:2,unit:"px",hint:"Each trial picks a mean grain diameter in this range."},
     {k:"sizeVar",label:"Size variety within an image",min:0,max:0.9,step:0.05},
     {k:"wobble",label:"Boundary waviness",min:0,max:1,step:0.05},
     {k:"greyMin",label:"Darkest grain",min:0,max:200,step:1,hint:"0 = black, 255 = white. Keep above the decoy grey."},
@@ -250,25 +283,17 @@ const CONTROLS = {
     {k:"twinContrast",label:"Twin band contrast",min:0,max:150,step:5},
   ],
   "f-target":[
-    {k:"targetMin",label:"Target size min",min:4,max:40,step:1,unit:"% of snippet"},
-    {k:"targetMax",label:"Target size max",min:4,max:40,step:1,unit:"% of snippet"},
+    {k:"targetMin",label:"Target size min",min:4,max:40,step:1,unit:"% of image"},
+    {k:"targetMax",label:"Target size max",min:4,max:40,step:1,unit:"% of image"},
     {k:"targetPure",label:"Target is pure black (no texture)",type:"check"},
     {k:"decoyStyle",label:"Decoy style",type:"select",opts:[["blob","Blobs (target-like)"],["grain","Dark grains"]]},
-    {k:"decoyCount",label:"Decoys in base image",min:0,max:40,step:1},
-    {k:"decoyNear",label:"…of which near the target",min:0,max:10,step:1,hint:"Placed close to the target so they land inside the snippets."},
-    {k:"decoyGrey",label:"Decoy grey",min:0,max:140,step:1,hint:"Tune by eye: close enough to need a careful look, not so close it’s impossible."},
+    {k:"decoyCount",label:"Decoys in base field",min:0,max:40,step:1},
+    {k:"decoyNear",label:"…of which near the target",min:0,max:10,step:1,hint:"Placed close to the target so they land inside the image."},
+    {k:"decoyGrey",label:"Decoy grey",min:0,max:140,step:1,hint:"The target always stays the darkest region."},
     {k:"decoyJitter",label:"Decoy grey variation ±",min:0,max:30,step:1},
   ],
-  "f-move":[
-    {k:"shiftMode",label:"Shift type",type:"select",opts:[["balanced","Balanced 50/50"],["single","X or Y only"],["X","X only"],["Y","Y only"],["XY","X and Y"]],hint:"Balanced: half the batch moves on one axis (X/Y split evenly), half on both."},
-    {k:"minShift",label:"Smallest shift",min:0,max:60,step:1,unit:"% of snippet"},
-    {k:"maxShift",label:"Largest shift",min:5,max:100,step:1,unit:"% of snippet"},
-    {k:"gainMin",label:"Noise: movement gain min",min:0,max:2,step:0.05},
-    {k:"gainMax",label:"Noise: movement gain max",min:0,max:2,step:0.05,hint:"Noisy snippet moves gain × the intended shift. 0.5 = moves half as far."},
-    {k:"jitter",label:"Noise: extra random offset ±",min:0,max:40,step:1,unit:"px"},
-  ],
   "f-color":[
-    {k:"recolorDelta",label:"Minimum grey change per grain",min:0,max:120,step:1,hint:"Every grain except the target and decoys gets a new grey at least this different."},
+    {k:"recolorDelta",label:"Minimum grey change per grain",min:0,max:120,step:1,hint:"Shifted + recolored trials: every grain except the target and decoys gets a new grey at least this different."},
   ],
   "f-tex":[
     {k:"texNoise",label:"Pixel noise",min:0,max:30,step:1},
@@ -280,12 +305,24 @@ const CONTROLS = {
     {k:"diffBands",label:"Bands through center",min:2,max:6,step:1},
   ],
   "f-export":[
-    {k:"batchN",label:"Sets in batch",min:1,max:200,step:1},
-    {k:"includeBase",label:"Include base images (large files)",type:"check"},
+    {k:"includeBase",label:"Also export base fields (for records; large)",type:"check"},
   ]
 };
 function newSeed(){return (Math.random()*0xFFFFFFFF)>>>0}
+function pxPerDeg(){const deg=2*Math.atan(P.screenCm/2/P.distCm)*180/Math.PI;return P.screenW/deg}
+function degToPx(d){return d*pxPerDeg()}
 
+/* ---------------- Design template (Exp_Design_Spreadsheet_Final, 6 Nov 2026) ---------------- */
+const DIRS={L:[-1,0],R:[1,0],U:[0,1],D:[0,-1],LU:[-1,1],LD:[-1,-1],RU:[1,1],RD:[1,-1]}; // design-sheet convention: U = +1
+const DIR_ORDER=["L","R","U","D","LU","LD","RU","RD"];
+function buildTemplate(){const rows=[];let id=0;
+  for(const block of [1,2]){let t=0;
+    for(const cond of ["No change","Shifted","Shifted + recolored"])for(const dir of DIR_ORDER){
+      const nc=cond==="No change",u=DIRS[dir];id++;t++;
+      rows.push({Block:block,Trial_in_block:t,Trial_ID:id,Condition:cond,Shift_Applied:nc?0:1,Recolor:cond==="Shifted + recolored"?1:0,
+        Shift_Axes:nc?"—":(dir.length===1?"One":"Two"),Shift_Direction:nc?"—":dir,dx:nc?0:u[0],dy:nc?0:u[1],Counterfactual_Direction:nc?dir:"—",Centering_Task:"Yes"})}}
+  return rows}
+const TRIALS=buildTemplate();
 /* ---------------- Real image support ---------------- */
 let REAL = null; // {w,h,gray:Float32Array,label:Int32Array,nLab,means:Float32Array}
 let realImgRaw=null, realMaskRaw=null;
@@ -456,37 +493,43 @@ function drawBlob(img,field,cx,cy,b,val,texMul){
     const cov=clamp(e+0.5,0,1);if(cov<=0)continue;const i=y*B+x;const v=clamp(val+field.tex[i]*texMul,lowest,255);img[i]=img[i]*(1-cov)+v*cov}
 }
 
-/* ---------------- Placement, shift, noise ---------------- */
-function place(field,placeSeed,noiseSeed,forcedType){
+/* ---------------- Placement ---------------- */
+// Returns the screen-space target move (y down) and the matching view (window) move for a direction name.
+function moveFor(dir){
+  const u=DIRS[dir];const d=degToPx(P.shiftDeg);const two=u[0]!==0&&u[1]!==0;const m=two&&P.diagMode==="diagonal"?d/Math.SQRT2:d;
+  const sx=Math.round(u[0]*m),sy=Math.round(-u[1]*m); // screen y points down
+  return P.dirMeaning==="target"?{tx:sx,ty:sy,vx:-sx,vy:-sy}:{tx:-sx,ty:-sy,vx:sx,vy:sy};
+}
+function placeTrial(field,placeSeed,row){
   const B=field.B,S=P.snip,r=mulberry32(hmix(placeSeed,51));
   const tMin=Math.min(P.targetMin,P.targetMax),tMax=Math.max(P.targetMin,P.targetMax);
   const target=makeBlob(r,S*lerp(tMin,tMax,r())/100/2);
-  const m=clamp(P.margin,target.Rmax+P.edgePad,B/2-1);
-  const tx=lerp(m,B-m,r()),ty=lerp(m,B-m,r());
   const reach=target.Rmax+P.edgePad;
+  const dir=row.Shift_Applied?row.Shift_Direction:row.Counterfactual_Direction;
+  const mv=moveFor(dir);
+  const W=S-2*reach;
+  if(Math.abs(mv.vx)>W||Math.abs(mv.vy)>W)throw new Error(`A ${Math.max(Math.abs(mv.vx),Math.abs(mv.vy))} px shift doesn’t fit: the target can only move ${Math.max(0,Math.floor(W))} px inside a ${S} px image. Raise the image size, or lower the shift distance or target size.`);
+  if(B<S+Math.abs(mv.vx)||B<S+Math.abs(mv.vy))throw new Error("The base field is too small for this shift. Raise “Base field = image ×”.");
   const lo=v=>Math.max(0,Math.ceil(v+reach-S)),hi=v=>Math.min(B-S,Math.floor(v-reach));
-  const loX=lo(tx),hiX=hi(tx),loY=lo(ty),hiY=hi(ty);
-  let type=forcedType;if(!type){const mode=P.shiftMode;type=mode==="X"||mode==="Y"||mode==="XY"?mode:mode==="single"?(r()<0.5?"X":"Y"):(r()<0.5?(r()<0.5?"X":"Y"):"XY")}
-  const minS=Math.round(S*P.minShift/100),maxS=Math.round(S*Math.max(P.minShift,P.maxShift)/100);
-  function axis(loA,hiA,moves){const W=hiA-loA;if(!moves){return {p1:Math.round(lerp(loA,hiA,r())),d:0}}
-    const top=Math.min(maxS,W);const mag=Math.round(lerp(Math.min(minS,top),top,r()));const sign=r()<0.5?-1:1;const dd=mag*sign;
-    const a=Math.max(loA,loA-dd),b=Math.min(hiA,hiA-dd);return {p1:Math.round(lerp(a,b,r())),d:dd,tooTight:minS>W}}
-  const ax=axis(loX,hiX,type!=="Y"),ay=axis(loY,hiY,type!=="X");
-  const s1={x:ax.p1,y:ay.p1},s2={x:ax.p1+ax.d,y:ay.p1+ay.d};
-  // noise
-  const rn=mulberry32(hmix(noiseSeed,61));const gl=Math.min(P.gainMin,P.gainMax),gh=Math.max(P.gainMin,P.gainMax);const gain=lerp(gl,gh,rn());
-  const jx=type!=="Y"?Math.round((rn()*2-1)*P.jitter):0,jy=type!=="X"?Math.round((rn()*2-1)*P.jitter):0;
-  let ndx=Math.round(ax.d*gain)+jx,ndy=Math.round(ay.d*gain)+jy;
-  const s2n={x:clamp(s1.x+ndx,loX,hiX),y:clamp(s1.y+ndy,loY,hiY)};ndx=s2n.x-s1.x;ndy=s2n.y-s1.y;
+  // find a target position where both windows (before and after the move) can contain it
+  let tx,ty,x1,y1,ok=false;const m=clamp(P.margin,reach,B/2-1);
+  for(let a=0;a<400&&!ok;a++){
+    tx=lerp(m,B-m,r());ty=lerp(m,B-m,r());
+    const ax=Math.max(lo(tx),lo(tx)-mv.vx),bx=Math.min(hi(tx),hi(tx)-mv.vx),ay=Math.max(lo(ty),lo(ty)-mv.vy),by=Math.min(hi(ty),hi(ty)-mv.vy);
+    if(ax<=bx&&ay<=by){x1=Math.round(lerp(ax,bx,r()));y1=Math.round(lerp(ay,by,r()));ok=true}}
+  if(!ok)throw new Error("Couldn’t place the target so it stays inside the image after the shift. Lower “Target keeps away from field edge”.");
+  const s1={x:x1,y:y1};const moved={x:x1+mv.vx,y:y1+mv.vy};
+  const s2=row.Shift_Applied?moved:{...s1};const cf=row.Shift_Applied?null:moved;
   // decoys
   const dec=[];const occupied=[{x:tx,y:ty,R:target.Rmax}];
   function free(x,y,R){for(const o of occupied){if(Math.hypot(o.x-x,o.y-y)<(o.R+R)*1.35)return false}return true}
   const nNear=Math.min(P.decoyNear,P.decoyCount);
-  for(let k=0;k<P.decoyCount;k++){const b=makeBlob(r,S*lerp(tMin,tMax,r())/100/2);const near=k<nNear;let ok=false,x,y;
-    for(let a=0;a<80&&!ok;a++){if(near){const ang=r()*6.283,dist=lerp(target.Rmax*2.2,S*0.75,r());x=tx+Math.cos(ang)*dist;y=ty+Math.sin(ang)*dist}else{x=lerp(b.Rmax,B-b.Rmax,r());y=lerp(b.Rmax,B-b.Rmax,r())}
-      ok=x>b.Rmax&&y>b.Rmax&&x<B-b.Rmax&&y<B-b.Rmax&&free(x,y,b.Rmax)}
-    if(ok){occupied.push({x,y,R:b.Rmax});dec.push({x,y,blob:b,grey:clamp(P.decoyGrey+Math.round((r()*2-1)*P.decoyJitter),0,255),near})}}
-  return {type,target:{x:tx,y:ty,blob:target},decoys:dec,s1,s2,s2n,shift:{dx:ax.d,dy:ay.d},noisy:{dx:ndx,dy:ndy,gain},tooTight:ax.tooTight||ay.tooTight};
+  for(let k=0;k<P.decoyCount;k++){const b=makeBlob(r,S*lerp(tMin,tMax,r())/100/2);const near=k<nNear;let good=false,x,y;
+    for(let a=0;a<80&&!good;a++){if(near){const ang=r()*6.283,dist=lerp(target.Rmax*2.2,S*0.6,r());x=tx+Math.cos(ang)*dist;y=ty+Math.sin(ang)*dist}else{x=lerp(b.Rmax,B-b.Rmax,r());y=lerp(b.Rmax,B-b.Rmax,r())}
+      good=x>b.Rmax&&y>b.Rmax&&x<B-b.Rmax&&y<B-b.Rmax&&free(x,y,b.Rmax)}
+    if(good){occupied.push({x,y,R:b.Rmax});dec.push({x,y,blob:b,grey:clamp(P.decoyGrey+Math.round((r()*2-1)*P.decoyJitter),0,255),near})}}
+  const sep=row.Shift_Applied?Math.hypot(mv.tx,mv.ty):0;
+  return {target:{x:tx,y:ty,blob:target},decoys:dec,s1,s2,cf,move:mv,moveDir:dir,sep};
 }
 function applyDecoyGrains(field,pl,greysList){
   // Dark-grain decoys: pick grains whose center is near each decoy position, darken them in every grey table
@@ -510,73 +553,43 @@ function buildDiffraction(seed,Pz){
   const out=new Uint8ClampedArray(Pz*Pz);for(let i=0;i<out.length;i++)out[i]=img[i];return {img:out,size:Pz,cx,cy};
 }
 
-/* ---------------- Set generation ---------------- */
+/* ---------------- Trial generation ---------------- */
 function crop(img,B,x,y,S){const out=new Uint8ClampedArray(S*S);for(let j=0;j<S;j++)out.set(img.subarray((y+j)*B+x,(y+j)*B+x+S),j*S);return out}
 const fieldCache={key:null,field:null};
-function generateSet(sd,forcedType,setNo){
+function derive(seed,i){return i===1?seed:hmix(seed,i*7919+13)}
+function trialSeeds(id){const sd={};for(const k in seeds)sd[k]=locks[k]?seeds[k]:derive(seeds[k],id);return sd}
+function generateTrial(row){
+  const sd=trialSeeds(row.Trial_ID);
   const S=P.snip,B=Math.round(S*P.mult);
   const useReal=P.mode==="real"&&REAL;
   const fkey=JSON.stringify([useReal?"r":"p",sd.shape,B,P.grainMin,P.grainMax,P.sizeVar,P.wobble,P.shading,P.twinProb,P.texNoise,P.scratches,P.pits,P.realScaleMin,P.realScaleMax,useReal?REAL.nLab:0]);
   let field;if(fieldCache.key===fkey)field=fieldCache.field;else{field=useReal?buildRealField(B,sd.shape):buildProceduralField(B,sd.shape);fieldCache.key=fkey;fieldCache.field=field}
-  const pl=place(field,sd.place,sd.noise,forcedType);
-  const g0=baseGreys(field,sd.color);const g1=recolorGreys(field,g0,hmix(sd.color,99));
-  if(P.decoyStyle==="grain")applyDecoyGrains(field,pl,[g0,g1]);
-  const imgs={};
-  for(const [suffix,G] of [["",g0],["_cc",g1]]){
-    const base=compose(field,G);
+  const pl=placeTrial(field,sd.place,row);
+  const g0=baseGreys(field,sd.color);const g1=row.Recolor?recolorGreys(field,g0,hmix(sd.color,99)):null;
+  if(P.decoyStyle==="grain")applyDecoyGrains(field,pl,g1?[g0,g1]:[g0]);
+  const paint=G=>{const base=compose(field,G);
     if(P.decoyStyle==="blob")for(const d of pl.decoys)drawBlob(base,field,d.x,d.y,d.blob,d.grey,0.6);
-    drawBlob(base,field,pl.target.x,pl.target.y,pl.target.blob,0,P.targetPure?0:0.6);
-    imgs["base"+suffix]=base;imgs["s1"+suffix]=crop(base,B,pl.s1.x,pl.s1.y,S);imgs["s2"+suffix]=crop(base,B,pl.s2.x,pl.s2.y,S);imgs["s2_noise"+suffix]=crop(base,B,pl.s2n.x,pl.s2n.y,S);
-  }
+    drawBlob(base,field,pl.target.x,pl.target.y,pl.target.blob,0,P.targetPure?0:0.6);return base};
+  const base=paint(g0);const baseCC=g1?paint(g1):null;
+  const imgs={base,search:crop(base,B,pl.s1.x,pl.s1.y,S),relocate:crop(baseCC||base,B,pl.s2.x,pl.s2.y,S)};
+  if(baseCC)imgs.base_cc=baseCC;
   const diff=buildDiffraction(hmix(sd.place,7),Math.round(P.diffSize));
   const inside=(d,s)=>d.x>=s.x&&d.x<s.x+S&&d.y>=s.y&&d.y<s.y+S;
-  return {setNo,seeds:{...sd},S,B,field:{kind:field.kind,d:field.d,scale:field.scale,unmasked:field.unmasked},pl,imgs,diff,
-    decoysIn:{s1:pl.decoys.filter(d=>inside(d,pl.s1)).length,s2:pl.decoys.filter(d=>inside(d,pl.s2)).length,s2n:pl.decoys.filter(d=>inside(d,pl.s2n)).length}};
+  return {row,seeds:sd,S,B,field:{kind:field.kind,d:field.d,scale:field.scale,unmasked:field.unmasked},pl,imgs,diff,
+    decoysIn:{search:pl.decoys.filter(d=>inside(d,pl.s1)).length,relocate:pl.decoys.filter(d=>inside(d,pl.s2)).length}};
 }
-
-/* ---------------- Rendering ---------------- */
-function grayToCanvas(cv,data,w,h){cv.width=w;cv.height=h;const x=cv.getContext("2d");const id=x.createImageData(w,h);const p=id.data;
-  for(let i=0;i<w*h;i++){const v=data[i];p[i*4]=p[i*4+1]=p[i*4+2]=v;p[i*4+3]=255}x.putImageData(id,0,0);return cv}
-const SNIPS=[["s1","Snippet 1"],["s2","Snippet 2"],["s2_noise","Snippet 2 + noise"]];
-function buildSnipTiles(){const el=document.getElementById("snips");el.innerHTML="";
-  for(const [suffix,row] of [["","Original colors"],["_cc","Color change"]]){
-    const lab=document.createElement("div");lab.className="rowlabel";lab.textContent=row;el.appendChild(lab);
-    for(const [k,name] of SNIPS){const t=document.createElement("div");t.className="tile";
-      t.innerHTML=`<div class="tilehead"><b>${name}</b><button class="save" data-img="${k+suffix}" type="button">PNG</button></div><canvas id="c_${k+suffix}" aria-label="${name}, ${row.toLowerCase()}"></canvas>`;el.appendChild(t)}}}
-let CUR=null, VIEW="";
-function render(){
-  if(!CUR)return;const s=CUR,S=s.S,B=s.B,pl=s.pl;
-  const cv=document.getElementById("cBase");grayToCanvas(cv,s.imgs["base"+VIEW],B,B);const x=cv.getContext("2d");const lw=Math.max(2,B/300);
-  if(document.getElementById("showBoxes").checked){
-    x.lineWidth=lw;x.setLineDash([]);x.strokeStyle="#e2524c";x.strokeRect(pl.s1.x,pl.s1.y,S,S);x.strokeStyle="#4aa8ec";x.strokeRect(pl.s2.x,pl.s2.y,S,S);
-    x.strokeStyle="#e8b03f";x.setLineDash([lw*4,lw*3]);x.strokeRect(pl.s2n.x,pl.s2n.y,S,S);x.setLineDash([]);}
-  if(document.getElementById("showMarks").checked){x.lineWidth=lw;x.strokeStyle="#00e08a";x.beginPath();x.arc(pl.target.x,pl.target.y,pl.target.blob.Rmax+lw*3,0,7);x.stroke();
-    x.strokeStyle="#ff4fd8";for(const d of pl.decoys){x.beginPath();x.arc(d.x,d.y,d.blob.Rmax+lw*2,0,7);x.stroke()}}
-  document.getElementById("baseTitle").textContent=VIEW?"Base image · color change":"Base image";
-  document.getElementById("baseDim").textContent=`${B}×${B}`;
-  for(const suffix of ["","_cc"])for(const [k] of SNIPS)grayToCanvas(document.getElementById("c_"+k+suffix),s.imgs[k+suffix],S,S);
-  grayToCanvas(document.getElementById("cDiff"),s.diff.img,s.diff.size,s.diff.size);document.getElementById("diffDim").textContent=`${s.diff.size}×${s.diff.size}`;
-  document.getElementById("diffNote").innerHTML=`Pattern center sits at (${s.diff.cx}, ${s.diff.cy}) in the image. For this set, the correct arrow-key movement equals the view shift: <b style="font-family:var(--mono)">${fmtShift(pl.shift.dx,pl.shift.dy)}</b>.`;
-  renderFacts();
+// Everything Experiment Builder needs for one trial, in screen pixels (origin top-left, y down)
+function trialGeometry(t){
+  const pl=t.pl,S=t.S,ppd=pxPerDeg();const left=Math.round((P.screenW-S)/2),top=Math.round((P.screenH-S)/2);
+  const old={x:left+pl.target.x-pl.s1.x,y:top+pl.target.y-pl.s1.y};const now={x:left+pl.target.x-pl.s2.x,y:top+pl.target.y-pl.s2.y};
+  const cf=pl.cf?{x:left+pl.target.x-pl.cf.x,y:top+pl.target.y-pl.cf.y}:null;
+  const cmx=pl.move.tx,cmy=pl.move.ty; // arrow-key movement that centers the pattern = the (actual or counterfactual) target move
+  const cx=Math.round(P.screenW/2),cy=Math.round(P.screenH/2);
+  return {left,top,old,now,cf,cmx,cmy,crossX:cx,crossY:cy,diffStartX:cx-cmx,diffStartY:cy-cmy,
+    roi:pl.target.blob.Rmax+P.roiDeg*ppd,sepPx:pl.sep,sepDeg:pl.sep/ppd,ppd};
 }
-function fmtShift(dx,dy){return `x ${dx>0?"+":""}${dx}, y ${dy>0?"+":""}${dy}`}
-function renderFacts(){
-  const s=CUR,pl=s.pl;const tS=(sn)=>`${Math.round(pl.target.x-sn.x)}, ${Math.round(pl.target.y-sn.y)}`;
-  const f=[
-    ["Shift type",`<span class="pill">${pl.type==="XY"?"X and Y":pl.type+" only"}</span>`],
-    ["View shift (px)",fmtShift(pl.shift.dx,pl.shift.dy)],
-    ["Noisy shift (px)",`${fmtShift(pl.noisy.dx,pl.noisy.dy)} · gain ${pl.noisy.gain.toFixed(2)}`],
-    ["Target in base",`${Math.round(pl.target.x)}, ${Math.round(pl.target.y)} · Ø ${Math.round(pl.target.blob.R*2)}`],
-    ["Target in snippet 1",tS(pl.s1)],["Target in snippet 2",tS(pl.s2)],["Target in snippet 2 + noise",tS(pl.s2n)],
-    ["Decoys visible",`S1 ${s.decoysIn.s1} · S2 ${s.decoysIn.s2} · S2n ${s.decoysIn.s2n}`],
-    [s.field.kind==="real"?"Real image zoom":"Mean grain size",s.field.kind==="real"?`${s.field.scale.toFixed(2)}× · ${(s.field.unmasked*100).toFixed(0)}% unmasked`:`${Math.round(s.field.d)} px`],
-  ];
-  document.getElementById("facts").innerHTML=f.map(([a,b])=>`<div class="fact"><span>${a}</span><b>${b}</b></div>`).join("");
-  document.getElementById("setLabel").textContent=pl.tooTight?"Shift range is tighter than the smallest shift; raise snippet size or lower target size.":"";
-}
-
 /* ---------------- Controls ---------------- */
-function fmtVal(c,v){if(c.type==="check")return "";const dec=(String(c.step).split(".")[1]||"").length;return Number(v).toFixed(dec)+(c.unit?(c.unit.startsWith("%")?"%":" "+c.unit):"")}
+function fmtVal(c,v){if(c.type==="check")return "";const dec=(String(c.step).split(".")[1]||"").length;return Number(v).toFixed(dec)+(c.unit?(c.unit.startsWith("%")||c.unit==="°"?c.unit.slice(0,1):" "+c.unit):"")}
 function buildControls(){
   for(const [box,list] of Object.entries(CONTROLS)){const el=document.getElementById(box);
     for(const c of list){const w=document.createElement("div");const id="p_"+c.k;
@@ -599,88 +612,153 @@ function buildSeeds(){const el=document.getElementById("seeds");el.innerHTML="";
     row.querySelector("#roll_"+k).addEventListener("click",()=>{seeds[k]=newSeed();syncSeeds();regen()})}}
 function syncSeeds(){for(const k in seeds)document.getElementById("seed_"+k).value=seeds[k]}
 let regenTimer=null;
-function changed(k){if(k==="mode")syncRealVisibility();if(k==="batchN"||k==="includeBase")return;clearTimeout(regenTimer);regenTimer=setTimeout(regen,180)}
+function changed(k){if(k==="mode")syncRealVisibility();updateDegCalc();if(k==="includeBase")return;clearTimeout(regenTimer);regenTimer=setTimeout(regen,180)}
+function updateDegCalc(){const ppd=pxPerDeg();const d=degToPx(P.shiftDeg);
+  document.getElementById("degCalc").textContent=`${ppd.toFixed(1)} px/° · shift ${Math.round(d)} px · image ${P.snip} px = ${(P.snip/ppd).toFixed(1)}°`}
 function regen(){const st=document.getElementById("genStatus");st.textContent="Generating…";
-  setTimeout(()=>{const t0=performance.now();try{CUR=generateSet({...seeds},null,1);render();st.textContent=`Ready · ${Math.round(performance.now()-t0)} ms`}catch(e){st.textContent="Error: "+e.message;console.error(e)}},20)}
+  setTimeout(()=>{const t0=performance.now();const eb=document.getElementById("errBox");
+    try{CUR=generateTrial(TRIALS[TI]);eb.hidden=true;render();st.textContent=`Ready · ${Math.round(performance.now()-t0)} ms`}
+    catch(e){st.textContent="Needs a settings change";eb.textContent=e.message;eb.hidden=false;console.error(e)}},20)}
+
+/* ---------------- Rendering ---------------- */
+let CUR=null, VIEW="", TI=0;
+function grayToCanvas(cv,data,w,h){cv.width=w;cv.height=h;const x=cv.getContext("2d");const id=x.createImageData(w,h);const p=id.data;
+  for(let i=0;i<w*h;i++){const v=data[i];p[i*4]=p[i*4+1]=p[i*4+2]=v;p[i*4+3]=255}x.putImageData(id,0,0);return cv}
+function trialLabel(r){return `Trial ${r.Trial_ID} · Block ${r.Block} · ${r.Condition} · ${r.Shift_Applied?r.Shift_Direction:"counterfactual "+r.Counterfactual_Direction}`}
+function render(){
+  if(!CUR)return;const t=CUR,S=t.S,B=t.B,pl=t.pl,row=t.row;
+  const hasCC=!!t.imgs.base_cc;const vcc=document.getElementById("vCC");vcc.disabled=!hasCC;const view=hasCC?VIEW:"";
+  document.getElementById("vOrig").setAttribute("aria-pressed",view==="");vcc.setAttribute("aria-pressed",view==="_cc");
+  const cv=document.getElementById("cBase");grayToCanvas(cv,view?t.imgs.base_cc:t.imgs.base,B,B);const x=cv.getContext("2d");const lw=Math.max(2,B/300);
+  if(document.getElementById("showBoxes").checked){x.lineWidth=lw;x.setLineDash([]);
+    x.strokeStyle="#e2524c";x.strokeRect(pl.s1.x,pl.s1.y,S,S);
+    if(row.Shift_Applied){x.strokeStyle="#4aa8ec";x.strokeRect(pl.s2.x,pl.s2.y,S,S)}
+    if(pl.cf){x.strokeStyle="#e8b03f";x.setLineDash([lw*4,lw*3]);x.strokeRect(pl.cf.x,pl.cf.y,S,S);x.setLineDash([])}}
+  if(document.getElementById("showMarks").checked){const g=trialGeometry(t);x.lineWidth=lw;x.strokeStyle="#00e08a";x.beginPath();x.arc(pl.target.x,pl.target.y,g.roi,0,7);x.stroke();
+    x.strokeStyle="#ff4fd8";for(const d of pl.decoys){x.beginPath();x.arc(d.x,d.y,d.blob.Rmax+lw*2,0,7);x.stroke()}}
+  document.getElementById("baseTitle").textContent=view?"Base field · recolored":"Base field";
+  document.getElementById("baseDim").textContent=`${B}×${B}`;
+  grayToCanvas(document.getElementById("cSearch"),t.imgs.search,S,S);
+  const rc=grayToCanvas(document.getElementById("cReloc"),t.imgs.relocate,S,S);
+  if(document.getElementById("showMarks").checked){const g=trialGeometry(t);const c=rc.getContext("2d");c.lineWidth=Math.max(2,S/200);
+    c.strokeStyle="#00e08a";c.beginPath();c.arc(pl.target.x-pl.s2.x,pl.target.y-pl.s2.y,g.roi,0,7);c.stroke();
+    c.strokeStyle="#e2524c";c.setLineDash([6,5]);c.beginPath();c.arc(pl.target.x-pl.s1.x,pl.target.y-pl.s1.y,g.roi,0,7);c.stroke();c.setLineDash([])}
+  grayToCanvas(document.getElementById("cDiff"),t.diff.img,t.diff.size,t.diff.size);document.getElementById("diffDim").textContent=`${t.diff.size}×${t.diff.size}`;
+  const g=trialGeometry(t);
+  document.getElementById("diffNote").innerHTML=`Zone-axis center sits at (${t.diff.cx}, ${t.diff.cy}) in the pattern image. Start the pattern center at <b style="font-family:var(--mono)">(${g.diffStartX}, ${g.diffStartY})</b> so the arrow keys must move it <b style="font-family:var(--mono)">${fmtShift(g.cmx,g.cmy)}</b> px to reach the crosshair at (${g.crossX}, ${g.crossY}).${row.Shift_Applied?"":" No change trial: the offset follows the counterfactual direction; the grain image does not move."}`;
+  renderFacts();
+}
+function fmtShift(dx,dy){return `x ${dx>0?"+":""}${dx}, y ${dy>0?"+":""}${dy}`}
+function renderFacts(){
+  const t=CUR,row=t.row,g=trialGeometry(t),pl=t.pl;const pt=p=>p?`${Math.round(p.x)}, ${Math.round(p.y)}`:"—";
+  const warnSep=row.Shift_Applied&&g.sepDeg<P.minSepDeg;
+  const f=[
+    ["Condition",`<span class="pill">${row.Condition}</span>`],
+    [row.Shift_Applied?"Shift direction":"Counterfactual direction",`${pl.moveDir} · dx ${DIRS[pl.moveDir][0]}, dy ${DIRS[pl.moveDir][1]}`],
+    ["Target move on screen (px)",row.Shift_Applied?fmtShift(pl.move.tx,pl.move.ty):"none (image does not move)"],
+    ["Old-to-new separation",row.Shift_Applied?`${Math.round(g.sepPx)} px · ${g.sepDeg.toFixed(2)}°${warnSep?" · below minimum":""}`:"0"],
+    ["Target, Phase 2 (screen)",pt(g.old)],["Target, Phase 5 (screen)",pt(g.now)],["Counterfactual location (screen)",pt(g.cf)],
+    ["Target ROI radius",`${Math.round(g.roi)} px · target ${Math.round(pl.target.blob.Rmax)} px`],
+    ["Decoys in image",`Phase 2: ${t.decoysIn.search} · Phase 5: ${t.decoysIn.relocate}`],
+    [t.field.kind==="real"?"Real image zoom":"Mean grain size",t.field.kind==="real"?`${t.field.scale.toFixed(2)}× · ${(t.field.unmasked*100).toFixed(0)}% unmasked`:`${Math.round(t.field.d)} px`],
+    ["Image position (screen)",`left ${g.left}, top ${g.top}`],
+    ["Pixels per degree",g.ppd.toFixed(1)],
+  ];
+  document.getElementById("facts").innerHTML=f.map(([a,b])=>`<div class="fact"><span>${a}</span><b>${b}</b></div>`).join("");
+}
 
 /* ---------------- Export ---------------- */
 let downloads=null;
 function pngBlob(data,w,h){return new Promise(res=>{const c=grayToCanvas(document.createElement("canvas"),data,w,h);c.toBlob(b=>res(b),"image/png")})}
-function setId(n){return "set"+String(n).padStart(3,"0")}
-const FILE_KEYS=["base","s1","s2","s2_noise","base_cc","s1_cc","s2_cc","s2_noise_cc"];
-function csvRow(s){const pl=s.pl,id=setId(s.setNo);const t=pl.target;const r=v=>Math.round(v);const f=k=>`${id}_${k}.png`;
-  return {set_id:id,shift_type:pl.type,snippet_px:s.S,base_px:s.B,view_dx:pl.shift.dx,view_dy:pl.shift.dy,noise_gain:pl.noisy.gain.toFixed(3),noisy_dx:pl.noisy.dx,noisy_dy:pl.noisy.dy,
-    s1_x:pl.s1.x,s1_y:pl.s1.y,s2_x:pl.s2.x,s2_y:pl.s2.y,s2n_x:pl.s2n.x,s2n_y:pl.s2n.y,
-    target_base_x:r(t.x),target_base_y:r(t.y),target_radius_px:r(t.blob.Rmax),
-    target_s1_x:r(t.x-pl.s1.x),target_s1_y:r(t.y-pl.s1.y),target_s2_x:r(t.x-pl.s2.x),target_s2_y:r(t.y-pl.s2.y),target_s2n_x:r(t.x-pl.s2n.x),target_s2n_y:r(t.y-pl.s2n.y),
-    decoys_in_s1:s.decoysIn.s1,decoys_in_s2:s.decoysIn.s2,decoys_in_s2n:s.decoysIn.s2n,
-    grain_size_px:s.field.d?r(s.field.d):"",real_zoom:s.field.scale?s.field.scale.toFixed(2):"",decoy_grey:P.decoyGrey,
-    img_base:P.includeBase?f("base"):"",img_s1:f("s1"),img_s2:f("s2"),img_s2_noise:f("s2_noise"),img_base_cc:P.includeBase?f("base_cc"):"",img_s1_cc:f("s1_cc"),img_s2_cc:f("s2_cc"),img_s2_noise_cc:f("s2_noise_cc"),
-    img_diffraction:f("diffraction"),diff_center_x:s.diff.cx,diff_center_y:s.diff.cy,
-    seed_shape:s.seeds.shape,seed_color:s.seeds.color,seed_place:s.seeds.place,seed_noise:s.seeds.noise}}
-function toCSV(rows){const cols=Object.keys(rows[0]);return [cols.join(","),...rows.map(r=>cols.map(c=>r[c]).join(","))].join("\r\n")}
-function setJSON(s){const pl=s.pl;const r=v=>Math.round(v*10)/10;return {set_id:setId(s.setNo),seeds:s.seeds,shift_type:pl.type,view_shift:pl.shift,noisy_shift:{dx:pl.noisy.dx,dy:pl.noisy.dy,gain:+pl.noisy.gain.toFixed(4)},
-  snippet1:pl.s1,snippet2:pl.s2,snippet2_noise:pl.s2n,target:{x:r(pl.target.x),y:r(pl.target.y),radius:r(pl.target.blob.Rmax)},
-  decoys:pl.decoys.map(d=>({x:r(d.x),y:r(d.y),radius:r(d.blob.Rmax),grey:d.grey,near_target:d.near})),field:s.field}}
-const README=`MoM E1 stimulus package
-=======================
-images/ holds every PNG (8-bit greyscale content). Per set:
-  setNNN_base.png, setNNN_s1.png, setNNN_s2.png, setNNN_s2_noise.png   original colors
-  setNNN_base_cc.png ... setNNN_s2_noise_cc.png                         color change (same layout, new greys)
-  setNNN_diffraction.png                                                line pattern, zone-axis center at diff_center_x/y
-stimuli.csv is one row per set (Experiment Builder data source). Rename columns to suit.
+function tid(n){return "T"+String(n).padStart(2,"0")}
+function exportRow(t){const r=t.row,g=trialGeometry(t),id=tid(r.Trial_ID),R=v=>Math.round(v);
+  const relocFile=r.Shift_Applied?`${id}_relocate.png`:`${id}_search.png`;
+  return {...r,
+    Image_Search:`${id}_search.png`,Image_Relocate:relocFile,Image_Diffraction:`${id}_diffraction.png`,
+    Image_Left:g.left,Image_Top:g.top,Image_Size_px:t.S,
+    Shift_px:R(degToPx(P.shiftDeg)),Shift_deg:P.shiftDeg,
+    Target_Move_X_px:r.Shift_Applied?t.pl.move.tx:0,Target_Move_Y_px:r.Shift_Applied?t.pl.move.ty:0,
+    Centering_Move_X_px:g.cmx,Centering_Move_Y_px:g.cmy,Crosshair_X:g.crossX,Crosshair_Y:g.crossY,Diff_Start_X:g.diffStartX,Diff_Start_Y:g.diffStartY,
+    Target_Old_X:R(g.old.x),Target_Old_Y:R(g.old.y),Target_New_X:R(g.now.x),Target_New_Y:R(g.now.y),
+    Counterfactual_X:g.cf?R(g.cf.x):"",Counterfactual_Y:g.cf?R(g.cf.y):"",
+    Target_Radius_px:R(t.pl.target.blob.Rmax),ROI_Radius_px:R(g.roi),Separation_px:R(g.sepPx),Separation_deg:g.sepDeg.toFixed(2),
+    Decoys_In_Search:t.decoysIn.search,Decoys_In_Relocate:t.decoysIn.relocate,Px_Per_Deg:g.ppd.toFixed(2),
+    Seed_Shape:t.seeds.shape,Seed_Color:t.seeds.color,Seed_Place:t.seeds.place}}
+function toDelim(rows,sep){const cols=Object.keys(rows[0]);const esc=v=>{v=String(v);if(sep==="\t"&&v==="—")v="NA";return sep===","&&/[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
+  return [cols.join(sep),...rows.map(r=>cols.map(c=>esc(r[c])).join(sep))].join("\r\n")+"\r\n"}
+function trialJSON(t){const pl=t.pl,r=v=>Math.round(v*10)/10;return {trial:t.row,seeds:t.seeds,geometry:trialGeometry(t),
+  window_phase2:pl.s1,window_phase5:pl.s2,window_counterfactual:pl.cf,target_field:{x:r(pl.target.x),y:r(pl.target.y),radius:r(pl.target.blob.Rmax)},
+  decoys_field:pl.decoys.map(d=>({x:r(d.x),y:r(d.y),radius:r(d.blob.Rmax),grey:d.grey})),field:t.field}}
+const README=`MoM E1 · Target relocation study · stimulus package
+====================================================
+Design: Exp_Design_Spreadsheet_Final (6 Nov 2026). 48 trials = 2 blocks x 24
+(8 No change, 8 Shifted, 8 Shifted + recolored per block). Control noise is not used.
+Trial order within a block is randomized at run time in Experiment Builder.
 
-Coordinates: pixels, origin at the top-left corner.
-  s1_x/s1_y etc.   top-left corner of each snippet inside the base image
-  view_dx/view_dy  how far the view (stage) moved from snippet 1 to snippet 2 (= s2 - s1)
-                   On screen the target moves by the opposite amount: target_s2 = target_s1 - view shift.
-                   The correct arrow-key movement of the diffraction pattern should equal this shift.
-  noisy_dx/dy      the shift actually applied for snippet 2 + noise (miscalibration): gain x intended (+ optional offset)
-  target_*         target center in the base image and in each snippet; target_radius_px = largest radius
-  decoys_in_*      decoy blobs whose center falls inside that snippet
-Trials: Tr = s1 -> s2. Tr+C = s1 -> s2_cc. Noise versions use s2_noise / s2_noise_cc.
-sets.json repeats this per set with decoy positions, and settings.json stores every generator setting.
-Re-enter the four seeds in the generator to rebuild any set exactly.`;
+images/
+  Txx_search.png        Phase 2 grain image (find and click the darkest grain)
+  Txx_relocate.png      Phase 5 grain image (Shifted / Shifted + recolored trials only;
+                        No change trials reuse Txx_search.png)
+  Txx_diffraction.png   Phase 3 Kikuchi pattern; zone-axis center at the image center
+  Txx_base*.png         optional: full base field (and recolored field) for records
+
+trials.csv / trials.txt (tab-delimited, ASCII "NA" instead of the sheet's "—") — Experiment Builder data source, one row per trial.
+  Columns Block ... Centering_Task match the Trials sheet exactly (dx/dy: U = +1, R = +1).
+  All *_X / *_Y columns are SCREEN pixels: origin top-left, y increases downward.
+  Image_Left/Top          where the grain image is drawn (image centered on screen)
+  Target_Move_X/Y_px      how far the target moves on screen from Phase 2 to Phase 5 (0 for No change)
+  Centering_Move_X/Y_px   arrow-key displacement that brings the zone axis to the crosshair.
+                          Shifted trials: equals the target move. No change trials: equals the
+                          counterfactual move, so every trial has the same centering offset.
+  Crosshair_X/Y           assumed at screen center; Diff_Start_X/Y = crosshair - centering move
+                          (where the pattern's zone-axis center starts)
+  Target_Old_X/Y          target center in Phase 2;  Target_New_X/Y  target center in Phase 5
+  Counterfactual_X/Y      No change trials: where the target would have been after the shift
+  ROI_Radius_px           target radius + the ROI margin (deg converted with Px_Per_Deg)
+trials.json repeats every trial with decoy positions; settings.json stores all settings and seeds.
+Re-enter the seeds in the generator to rebuild the set exactly.`;
 async function saveFile(filename,data){if(!downloads)return;try{await downloads.save({filename,data})}catch(e){const st=document.getElementById("batchStatus");st.textContent=e.code==="declined"?"Download cancelled.":"Couldn’t save: "+(e.message||e.code)}}
-async function addSetToZip(zip,s){const id=setId(s.setNo);const S=s.S,B=s.B;
-  for(const k of FILE_KEYS){if(!P.includeBase&&k.startsWith("base"))continue;const big=k.startsWith("base");zip.file(`images/${id}_${k}.png`,await pngBlob(s.imgs[k],big?B:S,big?B:S))}
-  zip.file(`images/${id}_diffraction.png`,await pngBlob(s.diff.img,s.diff.size,s.diff.size))}
-function batchTypes(n,seed){const mode=P.shiftMode;const r=mulberry32(hmix(seed,555));
-  if(mode==="X"||mode==="Y"||mode==="XY")return Array(n).fill(mode);
-  if(mode==="single"){const a=[];for(let i=0;i<n;i++)a.push(i%2?"Y":"X");return shuffle(a,r)}
-  const a=[];const half=Math.floor(n/2);for(let i=0;i<half;i++)a.push(i%2?"Y":"X");for(let i=half;i<n;i++)a.push("XY");return shuffle(a,r)}
-function derive(seed,i){return i===0?seed:hmix(seed,i*7919+13)}
-async function runExport(n,single){
+async function addTrialToZip(zip,t){const id=tid(t.row.Trial_ID),S=t.S,B=t.B;
+  zip.file(`images/${id}_search.png`,await pngBlob(t.imgs.search,S,S));
+  if(t.row.Shift_Applied)zip.file(`images/${id}_relocate.png`,await pngBlob(t.imgs.relocate,S,S));
+  zip.file(`images/${id}_diffraction.png`,await pngBlob(t.diff.img,t.diff.size,t.diff.size));
+  if(P.includeBase){zip.file(`images/${id}_base.png`,await pngBlob(t.imgs.base,B,B));if(t.imgs.base_cc)zip.file(`images/${id}_base_recolored.png`,await pngBlob(t.imgs.base_cc,B,B))}}
+async function runExport(single){
   const btns=[document.getElementById("saveBatch"),document.getElementById("saveSet")];btns.forEach(b=>b.disabled=true);
-  const st=document.getElementById("batchStatus"),bar=document.getElementById("prog");const zip=new JSZip();const rows=[],sets=[];
+  const st=document.getElementById("batchStatus"),bar=document.getElementById("prog");
   try{
-    const types=single?[CUR.pl.type]:batchTypes(n,seeds.place);
-    for(let i=0;i<n;i++){
-      let s;if(single)s=CUR;else{const sd={};for(const k in seeds)sd[k]=locks[k]?seeds[k]:derive(seeds[k],i);s=generateSet(sd,types[i],i+1)}
-      rows.push(csvRow(s));sets.push(setJSON(s));await addSetToZip(zip,s);
-      bar.style.width=((i+1)/n*90)+"%";st.textContent=`Set ${i+1} of ${n}`;await new Promise(r=>setTimeout(r,0))}
-    zip.file("stimuli.csv",toCSV(rows));zip.file("sets.json",JSON.stringify(sets,null,1));zip.file("settings.json",JSON.stringify({settings:P,seeds,locks},null,1));zip.file("README.txt",README);
+    if(typeof JSZip==="undefined")throw new Error("The zip library didn’t load. Check the connection and reload the page.");
+    const zip=new JSZip();const rows=[],js=[];const list=single?[TRIALS[TI]]:TRIALS;let minSep=Infinity;
+    for(let i=0;i<list.length;i++){const t=single?CUR:generateTrial(list[i]);
+      rows.push(exportRow(t));js.push(trialJSON(t));await addTrialToZip(zip,t);if(t.row.Shift_Applied)minSep=Math.min(minSep,t.pl.sep/pxPerDeg());
+      bar.style.width=((i+1)/list.length*90)+"%";st.textContent=`Trial ${i+1} of ${list.length}`;await new Promise(r=>setTimeout(r,0))}
+    zip.file("trials.csv",toDelim(rows,","));zip.file("trials.txt",toDelim(rows,"\t"));zip.file("trials.json",JSON.stringify(js,null,1));
+    zip.file("settings.json",JSON.stringify({design:"Exp_Design_Spreadsheet_Final (6 Nov 2026)",settings:P,seeds,locks,px_per_deg:pxPerDeg()},null,1));zip.file("README.txt",README);
     st.textContent="Compressing…";const blob=await zip.generateAsync({type:"blob",compression:"STORE"},m=>{bar.style.width=(90+m.percent*0.1)+"%"});
-    const counts=rows.reduce((a,r)=>(a[r.shift_type]=(a[r.shift_type]||0)+1,a),{});
-    st.textContent=`${n} set${n>1?"s":""} · ${(blob.size/1048576).toFixed(1)} MB · `+Object.entries(counts).map(([k,v])=>`${k} ${v}`).join(", ");
-    const stamp=new Date().toISOString().slice(0,10);await saveFile(single?`mom-e1_${setId(1)}_${stamp}.zip`:`mom-e1_stimuli_${n}sets_${stamp}.zip`,blob);
+    st.textContent=`${list.length} trial${list.length>1?"s":""} · ${(blob.size/1048576).toFixed(1)} MB`+(Number.isFinite(minSep)&&minSep<P.minSepDeg?` · warning: smallest separation ${minSep.toFixed(2)}° is below the minimum`:"");
+    const stamp=new Date().toISOString().slice(0,10);await saveFile(single?`mom-e1_${tid(TRIALS[TI].Trial_ID)}_${stamp}.zip`:`mom-e1_48trials_${stamp}.zip`,blob);
   }catch(e){st.textContent="Error: "+e.message;console.error(e)}
-  finally{btns.forEach(b=>b.disabled=false);if(!downloads)btns.forEach(b=>b.disabled=true)}
+  finally{btns.forEach(b=>b.disabled=!downloads)}
 }
 
 /* ---------------- Wiring ---------------- */
 function init(){
-  for(const k in seeds)seeds[k]=[2718281,3141592,1618033,1414213][Object.keys(seeds).indexOf(k)];
-  buildSeeds();buildControls();buildSnipTiles();
+  const start=[2718281,3141592,1618033];Object.keys(seeds).forEach((k,i)=>seeds[k]=start[i]);
+  buildSeeds();buildControls();updateDegCalc();
+  const sel=document.getElementById("trialSel");sel.innerHTML=TRIALS.map((r,i)=>`<option value="${i}">${trialLabel(r)}</option>`).join("");
+  TI=TRIALS.findIndex(r=>r.Condition==="Shifted + recolored"&&r.Shift_Direction==="LU");sel.value=TI;
+  const go=i=>{TI=(i+TRIALS.length)%TRIALS.length;sel.value=TI;regen()};
+  sel.addEventListener("change",()=>go(+sel.value));
+  document.getElementById("prevTrial").addEventListener("click",()=>go(TI-1));document.getElementById("nextTrial").addEventListener("click",()=>go(TI+1));
   document.getElementById("newSet").addEventListener("click",()=>{for(const k in seeds)if(!locks[k])seeds[k]=newSeed();syncSeeds();regen()});
-  const setView=v=>{VIEW=v;document.getElementById("vOrig").setAttribute("aria-pressed",v==="");document.getElementById("vCC").setAttribute("aria-pressed",v==="_cc");render()};
+  const setView=v=>{VIEW=v;render()};
   document.getElementById("vOrig").addEventListener("click",()=>setView(""));document.getElementById("vCC").addEventListener("click",()=>setView("_cc"));
   document.getElementById("showBoxes").addEventListener("change",render);document.getElementById("showMarks").addEventListener("change",render);
-  document.getElementById("saveBatch").addEventListener("click",()=>runExport(Math.round(P.batchN),false));
-  document.getElementById("saveSet").addEventListener("click",()=>runExport(1,true));
-  document.querySelector(".stage").addEventListener("click",async e=>{const b=e.target.closest(".save");if(!b||!CUR)return;const k=b.dataset.img;
-    let data,w,h;if(k==="diffraction"){data=CUR.diff.img;w=h=CUR.diff.size}else{const kk=k==="base"?"base"+VIEW:k;data=CUR.imgs[kk];w=h=kk.startsWith("base")?CUR.B:CUR.S;var name=kk}
-    await saveFile(`${setId(1)}_${name||k}.png`,await pngBlob(data,w,h))});
+  document.getElementById("saveBatch").addEventListener("click",()=>runExport(false));
+  document.getElementById("saveSet").addEventListener("click",()=>runExport(true));
+  document.querySelector(".stage").addEventListener("click",async e=>{const b=e.target.closest(".save");if(!b||!CUR)return;const k=b.dataset.img;const id=tid(CUR.row.Trial_ID);
+    let data,w,name=k;if(k==="diffraction"){data=CUR.diff.img;w=CUR.diff.size}else if(k==="base"){const cc=VIEW&&CUR.imgs.base_cc;data=cc?CUR.imgs.base_cc:CUR.imgs.base;w=CUR.B;name=cc?"base_recolored":"base"}else{data=CUR.imgs[k];w=CUR.S}
+    await saveFile(`${id}_${name}.png`,await pngBlob(data,w,w))});
   async function loadReal(){const st=document.getElementById("realState");if(!realImgRaw||!realMaskRaw){st.textContent=realImgRaw?"Micrograph loaded. Add its mask.":"Mask loaded. Add the micrograph.";return}
     st.textContent="Finding grains…";await new Promise(r=>setTimeout(r,20));
     try{REAL=buildReal(realImgRaw,realMaskRaw);fieldCache.key=null;st.textContent=`${REAL.grains} grains found · ${REAL.w}×${REAL.h}${REAL.unlabeled>0.05?` · ${(REAL.unlabeled*100).toFixed(0)}% outside the mask (crops avoid it where possible)`:""}`;regen()}
